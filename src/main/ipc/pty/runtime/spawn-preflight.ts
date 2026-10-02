@@ -23,6 +23,7 @@ import {
 import { stripRemotePaneEnvWhenHooksDisabled } from '../provider/liveness'
 import { isTuiAgent } from '../../../../shared/tui-agent-config'
 import { isClaudeAuthSwitchInProgress } from '../../../claude-accounts/live-pty-gate'
+import { hasAgentLaunchProfileHomeOverride } from '../../../../shared/agent-launch-profile/agent-launch-profile'
 import { hasClaudeAuthEnvConflict } from '../../../claude-accounts/environment'
 import {
   isSafePtySessionId,
@@ -130,7 +131,9 @@ export async function prepareRuntimePtySpawn(
   // notifyResumeUnavailable — runtime/relay panes start fresh without the notice.
   ctx.launchCommand = codexResumeLaunch.command
   ctx.claudeAuth =
-    ctx.isClaudeLaunch && ctx.deps.prepareClaudeAuth
+    ctx.isClaudeLaunch &&
+    ctx.deps.prepareClaudeAuth &&
+    !hasAgentLaunchProfileHomeOverride(args.env, 'CLAUDE_CONFIG_DIR')
       ? await ctx.deps.prepareClaudeAuth(ctx.codexSelectionTarget)
       : null
   if (ctx.isClaudeLaunch && isClaudeAuthSwitchInProgress()) {

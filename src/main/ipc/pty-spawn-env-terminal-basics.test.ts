@@ -9,6 +9,10 @@ import { __setWindowsPathRegistryLoaderForTests } from '../pty/windows-path-regi
 import { hasLiveClaudePtys, markClaudePtySpawned } from '../claude-accounts/live-pty-gate'
 import { wslHookRelayManager } from '../agent-hooks/wsl-hook-relay-manager'
 import { registerPtyHandlers, buildPtyHostEnv, clearProviderPtyState } from './pty'
+import {
+  applyAgentLaunchProfile,
+  agentLaunchProfileHomeOverrideEnv
+} from '../../shared/agent-launch-profile/agent-launch-profile'
 
 vi.mock('electron', () => import('./pty-ipc-mock-registry').then((m) => m.electronModuleMock()))
 vi.mock('fs', () => import('./pty-ipc-mock-registry').then((m) => m.fsModuleMock()))
@@ -58,6 +62,82 @@ describe('registerPtyHandlers', () => {
   const { handlers, mainWindow, spawnAndGetEnv, withBundledCli } = setupPtyIpcSuite()
 
   describe('spawn environment', () => {
+    it.each([
+      ['desktop', 'custom'],
+      ['runtime', 'custom'],
+      ['desktop', 'args-only'],
+      ['runtime', 'args-only'],
+      ['desktop', 'inherited-home'],
+      ['runtime', 'inherited-home'],
+      ['desktop', 'plain'],
+      ['runtime', 'plain']
+    ])('prepares the correct auth home for %s / %s launches', async (transport, profileKind) => {
+      const prepareClaudeAuth = vi.fn(async () => ({
+        configDir: '/tmp/selected-managed-account',
+        envPatch: { CLAUDE_CONFIG_DIR: '/tmp/selected-managed-account' },
+        stripAuthEnv: true,
+        provenance: 'managed:account-1'
+      }))
+      const runtime = {
+        setPtyController: vi.fn(),
+        createPreAllocatedTerminalHandle: vi.fn(() => 'term_external'),
+        preAllocateHandleForPty: vi.fn(() => 'term_external'),
+        onPtySpawned: vi.fn(),
+        onPtyExit: vi.fn(),
+        onPtyData: vi.fn(),
+        registerPreAllocatedHandleForPty: vi.fn(),
+        registerPty: vi.fn()
+      }
+      registerPtyHandlers(
+        mainWindow as never,
+        transport === 'runtime' ? (runtime as never) : undefined,
+        undefined,
+        undefined,
+        prepareClaudeAuth
+      )
+      const profileLaunch = applyAgentLaunchProfile({
+        profile:
+          profileKind === 'plain'
+            ? null
+            : {
+                id: 'claude-work',
+                agent: 'claude',
+                label: 'Work',
+                source: 'custom',
+                args: '--model sonnet',
+                env:
+                  profileKind === 'custom' ? { CLAUDE_CONFIG_DIR: '/tmp/external-claude-work' } : {}
+              },
+        agentArgs: '',
+        agentEnv: profileKind === 'inherited-home' ? { CLAUDE_CONFIG_DIR: '/tmp/old-home' } : {}
+      })
+      const args = {
+        cols: 80,
+        rows: 24,
+        command: 'claude',
+        env: profileLaunch.agentEnv
+      }
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        const result =
+          transport === 'runtime'
+            ? await runtime.setPtyController.mock.calls[0][0].spawn(args)
+            : await handlers.get('pty:spawn')!(null, args)
+        try {
+          const options = spawnMock.mock.calls.at(-1)?.[2]
+          expect(options.env.CLAUDE_CONFIG_DIR).toBe(
+            profileKind === 'custom' ? '/tmp/external-claude-work' : '/tmp/selected-managed-account'
+          )
+          expect(prepareClaudeAuth).toHaveBeenCalledTimes(profileKind === 'custom' ? 0 : attempt)
+          const marker = agentLaunchProfileHomeOverrideEnv('CLAUDE_CONFIG_DIR')
+          expect(options.env[marker]).toBeUndefined()
+          expect(profileLaunch.agentEnv[marker]).toBe(
+            profileKind === 'custom' ? 'claude-work' : undefined
+          )
+        } finally {
+          clearProviderPtyState(result.id)
+        }
+      }
+    })
     it('routes headless browser launches through the owning Orca workspace', () => {
       const inheritedBrowser = process.env.BROWSER
       delete process.env.BROWSER

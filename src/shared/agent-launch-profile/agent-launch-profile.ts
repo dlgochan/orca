@@ -45,6 +45,11 @@ export function agentLaunchProfileHomeMarkerEnv(envVar: AgentLaunchProfileHomeEn
   return `ORCA_${envVar}_PROFILE`
 }
 
+/** Records profile-owned env separately from homes resolved by the execution host. */
+export function agentLaunchProfileHomeOverrideEnv(envVar: AgentLaunchProfileHomeEnvVar): string {
+  return `ORCA_${envVar}_PROFILE_OVERRIDE`
+}
+
 export const CODEX_SECONDARY_HOME_PROFILE_ID = 'codex-secondary-home'
 export const CLAUDE_SECONDARY_HOME_PROFILE_ID = 'claude-secondary-home'
 
@@ -195,11 +200,19 @@ export function applyAgentLaunchProfile(opts: {
   if (!profile) {
     return { agentArgs, agentEnv }
   }
+  const profileEnv = { ...agentEnv, ...profile.env }
+  for (const envVar of ['CLAUDE_CONFIG_DIR', 'CODEX_HOME'] as const) {
+    const marker = agentLaunchProfileHomeOverrideEnv(envVar)
+    // Agent defaults and stale launch metadata must not claim ownership for this profile.
+    delete profileEnv[marker]
+    if (profile.env?.[envVar]?.trim()) {
+      profileEnv[marker] = profile.id
+    }
+  }
   return {
     agentArgs: [agentArgs.trim(), profile.args?.trim()].filter(Boolean).join(' '),
     agentEnv: {
-      ...agentEnv,
-      ...profile.env,
+      ...profileEnv,
       [AGENT_LAUNCH_PROFILE_ENV]: profile.id,
       ...(profile.home
         ? { [agentLaunchProfileHomeMarkerEnv(profile.home.envVar)]: profile.id }
@@ -222,6 +235,20 @@ export function hasAgentLaunchProfileHomeMarker(
   envVar: AgentLaunchProfileHomeEnvVar
 ): boolean {
   return isAgentLaunchProfileId(env?.[agentLaunchProfileHomeMarkerEnv(envVar)])
+}
+
+/** Explicit profile homes own authentication; args-only profiles keep managed selection. */
+export function hasAgentLaunchProfileHomeOverride(
+  env: Record<string, string> | NodeJS.ProcessEnv | null | undefined,
+  envVar: AgentLaunchProfileHomeEnvVar
+): boolean {
+  const profileId = agentLaunchProfileIdFromEnv(env)
+  return (
+    hasAgentLaunchProfileHomeMarker(env, envVar) ||
+    (profileId !== null &&
+      env?.[agentLaunchProfileHomeOverrideEnv(envVar)] === profileId &&
+      Boolean(env?.[envVar]?.trim()))
+  )
 }
 
 export type AgentLaunchProfilePickerSettings = {

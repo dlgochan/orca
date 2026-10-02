@@ -6,17 +6,97 @@ import {
   CLAUDE_SECONDARY_HOME_PROFILE_ID,
   CODEX_SECONDARY_HOME_PROFILE_ID,
   agentLaunchProfileHomeMarkerEnv,
+  agentLaunchProfileHomeOverrideEnv,
   agentLaunchProfileIdFromEnv,
   agentLaunchProfilesForAgent,
   applyAgentLaunchProfile,
   findAgentLaunchProfile,
   hasAgentLaunchProfileHomeMarker,
+  hasAgentLaunchProfileHomeOverride,
   isAgentLaunchProfileId,
   normalizeAgentLaunchProfileSettings,
   resolveAgentLaunchProfiles
 } from './agent-launch-profile'
 
 describe('agent launch profiles', () => {
+  it('recognizes custom credential homes without treating ordinary or args-only launches as external', () => {
+    expect(
+      hasAgentLaunchProfileHomeOverride(
+        {
+          ORCA_AGENT_LAUNCH_PROFILE: 'claude-work',
+          ORCA_CLAUDE_CONFIG_DIR_PROFILE_OVERRIDE: 'claude-work',
+          CLAUDE_CONFIG_DIR: '/external'
+        },
+        'CLAUDE_CONFIG_DIR'
+      )
+    ).toBe(true)
+    for (const marker of [undefined, 'other-profile']) {
+      expect(
+        hasAgentLaunchProfileHomeOverride(
+          {
+            ORCA_AGENT_LAUNCH_PROFILE: 'claude-work',
+            ORCA_CLAUDE_CONFIG_DIR_PROFILE_OVERRIDE: marker,
+            CLAUDE_CONFIG_DIR: '/inherited'
+          },
+          'CLAUDE_CONFIG_DIR'
+        )
+      ).toBe(false)
+    }
+    expect(
+      hasAgentLaunchProfileHomeOverride(
+        {
+          CLAUDE_CONFIG_DIR: '/inherited'
+        },
+        'CLAUDE_CONFIG_DIR'
+      )
+    ).toBe(false)
+    expect(
+      hasAgentLaunchProfileHomeOverride(
+        {
+          ORCA_AGENT_LAUNCH_PROFILE: 'claude-work',
+          CLAUDE_CONFIG_DIR: ' '
+        },
+        'CLAUDE_CONFIG_DIR'
+      )
+    ).toBe(false)
+    expect(
+      hasAgentLaunchProfileHomeOverride(
+        {
+          ORCA_AGENT_LAUNCH_PROFILE: 'claude-work'
+        },
+        'CLAUDE_CONFIG_DIR'
+      )
+    ).toBe(false)
+    expect(
+      hasAgentLaunchProfileHomeOverride(
+        {
+          ORCA_CLAUDE_CONFIG_DIR_PROFILE: CLAUDE_SECONDARY_HOME_PROFILE_ID
+        },
+        'CLAUDE_CONFIG_DIR'
+      )
+    ).toBe(true)
+  })
+  it('recomputes home ownership from the selected profile instead of agent defaults', () => {
+    const marker = agentLaunchProfileHomeOverrideEnv('CLAUDE_CONFIG_DIR')
+    for (const home of [undefined, '', ' ', '/explicit']) {
+      const launch = applyAgentLaunchProfile({
+        profile: {
+          id: 'claude-work',
+          agent: 'claude',
+          label: 'Work',
+          source: 'custom',
+          env: home === undefined ? {} : { CLAUDE_CONFIG_DIR: home }
+        },
+        agentArgs: '',
+        agentEnv: { CLAUDE_CONFIG_DIR: '/inherited', [marker]: 'claude-work' }
+      })
+      expect(hasAgentLaunchProfileHomeOverride(launch.agentEnv, 'CLAUDE_CONFIG_DIR')).toBe(
+        home === '/explicit'
+      )
+      expect(launch.agentEnv[marker]).toBe(home === '/explicit' ? 'claude-work' : undefined)
+      expect(hasAgentLaunchProfileHomeMarker(launch.agentEnv, 'CLAUDE_CONFIG_DIR')).toBe(false)
+    }
+  })
   it('ships one secondary-home profile per credential-home agent', () => {
     expect(BUILT_IN_AGENT_LAUNCH_PROFILES.map((profile) => profile.id)).toEqual([
       CODEX_SECONDARY_HOME_PROFILE_ID,

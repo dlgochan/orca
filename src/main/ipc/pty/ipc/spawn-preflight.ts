@@ -3,7 +3,7 @@ import {
   resolveLocalWindowsTerminalRuntimeOptions
 } from '../../../../shared/local-windows-terminal-runtime'
 import { isWslUncPath, toWindowsWslPath } from '../../../../shared/wsl-paths'
-import { hasAgentLaunchProfileHomeMarker } from '../../../../shared/agent-launch-profile/agent-launch-profile'
+import { hasAgentLaunchProfileHomeOverride } from '../../../../shared/agent-launch-profile/agent-launch-profile'
 import { isClaudeAuthSwitchInProgress } from '../../../claude-accounts/live-pty-gate'
 import { mintPtySessionId } from '../../../daemon/pty-session-id'
 import { resolveWslSessionContext } from '../../../daemon/wsl-session-context'
@@ -222,12 +222,12 @@ export async function preparePtyIpcSpawnPreflight(ctx: PtyIpcSpawnState): Promis
     ctx.cwd,
     ctx.expectedWslDistro
   )
-  // Why: a secondary-home profile carries its own Claude credentials; materializing the managed
+  // Why: an explicit-home profile carries its own Claude credentials; materializing the managed
   // account into ~/.claude (and stripping auth env) would target a directory this launch never reads.
   ctx.claudeAuth =
     ctx.isClaudeLaunch &&
     ctx.deps.prepareClaudeAuth &&
-    !hasAgentLaunchProfileHomeMarker(args.env, 'CLAUDE_CONFIG_DIR')
+    !hasAgentLaunchProfileHomeOverride(args.env, 'CLAUDE_CONFIG_DIR')
       ? await ctx.deps.prepareClaudeAuth(initialSelectionTarget)
       : null
   ctx.spawnTiming.mark('auth')

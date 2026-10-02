@@ -62,8 +62,10 @@ remote's own `ORCA_*_SECONDARY_HOME` override is not consulted there.
 - A Codex launch carrying the Codex marker skips managed-home selection and the managed-auth
   wait, drops the managed-home hook preflight, and is recorded in `codex-pane-accounts.json` as
   `homeRoute: 'custom-home'` with `launchProfileId`, so stale-account prompts never name it.
-- A Claude launch carrying the Claude marker skips the managed credential materialization into
-  `~/.claude` and its auth-env stripping, because the launch reads a different directory.
+- A Claude launch carrying the Claude marker, or a custom profile with a nonempty
+  `CLAUDE_CONFIG_DIR`, skips managed credential materialization and auth-env stripping in
+  desktop and runtime spawns. The explicit home remains authoritative. Args-only profiles
+  retain the ordinary managed-account preparation.
 
 ## Surfaces
 

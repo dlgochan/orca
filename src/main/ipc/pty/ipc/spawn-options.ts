@@ -1,4 +1,5 @@
 import { isTuiAgent } from '../../../../shared/tui-agent-config'
+import { agentLaunchProfileHomeOverrideEnv } from '../../../../shared/agent-launch-profile/agent-launch-profile'
 import { CLAUDE_AUTH_ENV_VARS } from '../../../claude-accounts/environment'
 import { LEGACY_TERMINAL_SHIM_REMOTE_ENV_KEYS } from '../../../pty/legacy-terminal-shim-dir'
 import { CODEX_HOME_ENV_KEYS } from '../host-env/codex-home'
@@ -24,15 +25,18 @@ export async function buildPtyIpcSpawnOptions(
   ctx: PtyIpcSpawnState
 ): Promise<{ isReattach: true } | null> {
   const args = ctx.args
-  ctx.spawnEnv = ctx.preAllocatedHandle
-    ? { ...ctx.env, ORCA_TERMINAL_HANDLE: ctx.preAllocatedHandle }
-    : ctx.env
+  // Preserve the launch snapshot when consuming preflight-only profile metadata.
+  ctx.spawnEnv = {
+    ...ctx.env,
+    ...(ctx.preAllocatedHandle ? { ORCA_TERMINAL_HANDLE: ctx.preAllocatedHandle } : {})
+  }
   const envToDelete = ctx.claudeAuth?.stripAuthEnv
     ? [...CLAUDE_AUTH_ENV_VARS, 'ANTHROPIC_CUSTOM_HEADERS']
     : undefined
   ctx.combinedEnvToDelete = mergePtyEnvDeletions(
     envToDelete,
     args.envToDelete ?? [],
+    (['CLAUDE_CONFIG_DIR', 'CODEX_HOME'] as const).map(agentLaunchProfileHomeOverrideEnv),
     ctx.agentTeamsEnvToDelete ?? [],
     // Why: disable old hosts without removing ORCA_REAL_* while their Windows shim remains on PATH.
     ctx.isDaemonHostSpawn || args.connectionId ? LEGACY_TERMINAL_SHIM_REMOTE_ENV_KEYS : [],
