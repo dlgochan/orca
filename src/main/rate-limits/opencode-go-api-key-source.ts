@@ -8,6 +8,8 @@ import { tableExists } from '../opencode-usage/schema-helpers'
 import { isWslUncPath } from '../../shared/wsl-paths'
 import { resolveOpenCodeDataDirectory } from '../opencode/opencode-data-directory'
 import Database from '../sqlite/sync-database'
+import { getManagedDataAccountService } from '../managed-data-accounts/service'
+import { restoreManagedDataAccountEnvironment } from '../../shared/managed-data-account-environment'
 
 /** OpenCode's provider/integration id for the Go subscription. */
 const OPENCODE_GO_INTEGRATION_ID = 'opencode-go'
@@ -124,10 +126,14 @@ function selectCredentialKey(database: Database.Database): string | null {
  * empty on a real 1.18.16 install), so probe it regardless of version.
  * @returns The key, or null when no database, table, or row carries one.
  */
-export async function readOpenCodeCredentialDatabaseGoKey(): Promise<string | null> {
+export async function readOpenCodeCredentialDatabaseGoKey(
+  environment: NodeJS.ProcessEnv = process.env
+): Promise<string | null> {
   let paths: string[]
   try {
-    paths = [...(await listOpenCodeDatabases())].sort(compareOpenCodeClaimPriority)
+    paths = [...(await listOpenCodeDatabases(undefined, environment))].sort(
+      compareOpenCodeClaimPriority
+    )
   } catch {
     return null
   }
@@ -174,12 +180,16 @@ export async function resolveOpenCodeGoApiKey(input: {
   settingsOverride?: string
   environment?: NodeJS.ProcessEnv
 }): Promise<OpenCodeGoApiKeyResolution> {
-  const environment = input.environment ?? process.env
   const override = trimmedKey(input.settingsOverride)
   if (override) {
     return { status: 'found', key: override, tier: 'settings' }
   }
-  const fromDatabase = await readOpenCodeCredentialDatabaseGoKey()
+  const environment = input.environment ?? { ...process.env }
+  if (!input.environment) {
+    restoreManagedDataAccountEnvironment(environment)
+    Object.assign(environment, getManagedDataAccountService().launchEnvironment('opencode'))
+  }
+  const fromDatabase = await readOpenCodeCredentialDatabaseGoKey(environment)
   if (fromDatabase) {
     return { status: 'found', key: fromDatabase, tier: 'opencode-credential-database' }
   }
