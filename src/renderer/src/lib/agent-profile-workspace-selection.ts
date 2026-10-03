@@ -13,6 +13,7 @@ import type { useAppStore } from '@/store'
 import { isPairedWebClientWindow } from './desktop-window-chrome'
 import { getRuntimeEnvironmentIdForWorktree } from './worktree-runtime-owner'
 import { getConnectionIdFromState } from './connection-owner-resolution'
+import type { ExecutionHostId } from '../../../shared/execution-host'
 import type { TuiAgent } from '../../../shared/tui-agent'
 export function assertAgentProfileWorkspace(
   store: ReturnType<typeof useAppStore.getState>,
@@ -64,13 +65,15 @@ export function assertStructuredAgentProfileWorkspace(
   store: ReturnType<typeof useAppStore.getState>,
   agent: string,
   worktreeId: string,
-  profile?: AgentLaunchProfile
+  profile?: AgentLaunchProfile,
+  executionHostId: ExecutionHostId = 'local'
 ): void {
   if (!profile) {
     return
   }
   assertAgentProfileWorkspace(store, agent, worktreeId)
   if (
+    executionHostId !== 'local' ||
     profile.agent !== agent ||
     profile.hostId !== 'local' ||
     profileRequiresFreshTerminal(profile.binding)

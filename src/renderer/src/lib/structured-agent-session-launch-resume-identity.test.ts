@@ -4,6 +4,7 @@
 // the identity under test is derived there — mocking it out would assert only the mock's shape.
 
 import type { AgentLaunchProfile } from '../../../shared/agent-launch-profile'
+import { createStructuredAgentSessionLaunchIntent } from './launch-structured-agent-session'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StructuredAgentSessionCreateParams } from '../../../shared/structured-agent-session-create'
 
@@ -108,6 +109,12 @@ describe('a launch that adopts a conversation is its own identity', () => {
       }
       const first = startStructuredAgentLaunch(worktreeId, agent, { agentProfile: a })
       expect(getStructuredAgentLaunchStatus(worktreeId, agent, a)).toBe('pending')
+      expect(() =>
+        startStructuredAgentLaunch(worktreeId, agent, {
+          agentProfile: a,
+          executionHostId: 'runtime:server-1'
+        })
+      ).toThrow(/local terminal/)
       expect(getStructuredAgentLaunchStatus(worktreeId, agent, b)).toBe('idle')
       const second = startStructuredAgentLaunch(worktreeId, agent, { agentProfile: b })
       const joined = startStructuredAgentLaunch(worktreeId, agent, {
@@ -127,6 +134,35 @@ describe('a launch that adopts a conversation is its own identity', () => {
       expect(localStorage.getItem('orca:structuredAgentLaunches:v1')).toContain('Original A')
       expect(localStorage.getItem('orca:structuredAgentLaunches:v1')).not.toContain('Renamed')
       vi.unstubAllGlobals()
+    }
+  )
+
+  it.each(['claude', 'codex'] as const)(
+    'refuses an explicit paired target for a local %s profile before host admission',
+    (agent) => {
+      vi.stubGlobal('navigator', { userAgent: 'Linux' })
+      try {
+        expect(() =>
+          createStructuredAgentSessionLaunchIntent(
+            `wt-profile-${agent}`,
+            agent,
+            'runtime:server-1',
+            undefined,
+            undefined,
+            {
+              id: 'paired-refusal',
+              name: 'Profile',
+              agent,
+              hostId: 'local',
+              executable: `/bin/${agent}`,
+              binding: { kind: 'managed', accountId: 'a' }
+            }
+          )
+        ).toThrow(/local terminal/)
+        expect(mocks.call).not.toHaveBeenCalled()
+      } finally {
+        vi.unstubAllGlobals()
+      }
     }
   )
 
