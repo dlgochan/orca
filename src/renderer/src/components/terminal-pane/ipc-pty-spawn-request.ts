@@ -22,6 +22,7 @@ export async function spawnIpcPty(
     envToDelete,
     command,
     commandDelivery,
+    agentProfileId,
     launchConfig,
     resumeProviderSession,
     launchToken,
@@ -53,6 +54,9 @@ export async function spawnIpcPty(
     command: connectOptions.command ?? command,
     ...((connectOptions.commandDelivery ?? commandDelivery)
       ? { commandDelivery: connectOptions.commandDelivery ?? commandDelivery }
+      : {}),
+    ...((connectOptions.agentProfileId ?? agentProfileId) !== undefined
+      ? { agentProfileId: connectOptions.agentProfileId ?? agentProfileId }
       : {}),
     ...((connectOptions.launchConfig ?? launchConfig)
       ? { launchConfig: connectOptions.launchConfig ?? launchConfig }

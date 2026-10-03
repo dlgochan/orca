@@ -207,6 +207,7 @@ export type TerminalActions = {
       startupCommandDelivery?: StartupCommandDelivery
       env?: Record<string, string>
       envToDelete?: string[]
+      agentProfileId?: string
       launchConfig?: SleepingAgentLaunchConfig
       resumeProviderSession?: AgentProviderSessionMetadata
       launchToken?: string
@@ -233,6 +234,7 @@ export type TerminalActions = {
     startupCommandDelivery?: StartupCommandDelivery
     env?: Record<string, string>
     envToDelete?: string[]
+    agentProfileId?: string
     launchConfig?: SleepingAgentLaunchConfig
     resumeProviderSession?: AgentProviderSessionMetadata
     launchToken?: string

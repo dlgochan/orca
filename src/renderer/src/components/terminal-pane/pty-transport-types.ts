@@ -161,6 +161,7 @@ export type PtyTransport = {
     commandDelivery?: 'renderer' | 'provider'
     env?: Record<string, string>
     envToDelete?: string[]
+    agentProfileId?: string
     launchConfig?: SleepingAgentLaunchConfig
     resumeProviderSession?: AgentProviderSessionMetadata
     launchToken?: string
@@ -258,6 +259,7 @@ export type IpcPtyTransportOptions = {
   envToDelete?: string[]
   command?: string
   commandDelivery?: 'renderer' | 'provider'
+  agentProfileId?: string
   launchConfig?: SleepingAgentLaunchConfig
   resumeProviderSession?: AgentProviderSessionMetadata
   agentPrompt?: string

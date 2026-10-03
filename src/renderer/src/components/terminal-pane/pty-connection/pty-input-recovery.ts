@@ -88,6 +88,9 @@ export function installPtyInputRecovery(session: ConnectPanePtySession): void {
     ...(session.terminalColorQueryReplies
       ? { terminalColorQueryReplies: session.terminalColorQueryReplies }
       : {}),
+    ...(session.paneStartup?.agentProfileId !== undefined
+      ? { agentProfileId: session.paneStartup.agentProfileId }
+      : {}),
     ...(session.paneStartup?.launchConfig
       ? { launchConfig: session.paneStartup.launchConfig }
       : {}),
