@@ -1,3 +1,5 @@
+import { reserveCodexProfileAccountOwner } from '../codex/codex-pane-account-registry'
+import { validateManagedCodexProfileLaunch } from '../codex-accounts/profile-launch-preflight'
 // Provider-owned account records and home gates are the only managed binding authority.
 import type { Store } from '../persistence'
 import type { ClaudeRuntimeAuthService } from '../claude-accounts/runtime-auth-service'
@@ -101,10 +103,17 @@ export function createManagedProfileAdapters(services: ManagedProfileServices) {
       }
     }),
     codex: createCodexProfileAdapter({
+      validateLaunch: validateManagedCodexProfileLaunch,
       inspectManaged: async (id) => codexObservation(id),
       prepareManaged: async (id) => {
-        const home = await services.codexRuntimeHome.prepareForCodexProfileLaunch(id)
-        return { home, envPatch: { CODEX_HOME: home }, envToDelete: [], release: () => {} }
+        const release = reserveCodexProfileAccountOwner(id)
+        try {
+          const home = await services.codexRuntimeHome.prepareForCodexProfileLaunch(id)
+          return { home, envPatch: { CODEX_HOME: home }, envToDelete: [], release }
+        } catch (error) {
+          release()
+          throw error
+        }
       }
     })
   }

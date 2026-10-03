@@ -36,6 +36,7 @@ export type TerminalCreateOptions = {
   cwd?: string
   env?: Record<string, string>
   envToDelete?: string[]
+  agentProfileId?: string
   launchConfig?: WorktreeStartupLaunch['launchConfig']
   resumeProviderSession?: AgentProviderSessionMetadata
   launchToken?: string

@@ -1,6 +1,8 @@
+import { copyAgentProfileSnapshot } from './agent-launch-profile'
 import type { SleepingAgentLaunchConfig } from './agent-session-resume'
 
 export function buildSleepingAgentLaunchConfig(args: {
+  agentProfile?: SleepingAgentLaunchConfig['agentProfile']
   claudeAccountId?: string | null
   claudeProfile?: SleepingAgentLaunchConfig['claudeProfile']
   agentCommand?: string | null
@@ -9,6 +11,9 @@ export function buildSleepingAgentLaunchConfig(args: {
   ompResumeFilePath?: string | null
 }): SleepingAgentLaunchConfig {
   return {
+    ...(args.agentProfile !== undefined
+      ? { agentProfile: copyAgentProfileSnapshot(args.agentProfile) }
+      : {}),
     ...(args.claudeAccountId !== undefined ? { claudeAccountId: args.claudeAccountId } : {}),
     ...(args.claudeProfile ? { claudeProfile: { ...args.claudeProfile } } : {}),
     ...(args.agentCommand?.trim() ? { agentCommand: args.agentCommand } : {}),

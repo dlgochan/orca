@@ -2,7 +2,7 @@
 
 Runs terminal creation through the runtime controller.
 
-- `spawn-preflight.ts`, `spawn-claude-auth.ts`: validate and prepare launch inputs.
+- `spawn-preflight.ts`, `spawn-profile.ts`, `spawn-claude-auth.ts`: validate and prepare launch inputs.
 - `spawn-options.ts`: constructs provider spawn options.
 - `spawn-state.ts`: carries state across launch stages.
 

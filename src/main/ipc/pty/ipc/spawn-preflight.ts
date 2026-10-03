@@ -1,3 +1,7 @@
+import {
+  prepareTerminalProfileLaunch,
+  hasTerminalProfileBinding
+} from '../host-env/agent-profile-launch'
 import { prepareClaudeTerminalAuth } from '../host-env/claude-launch-auth'
 import {
   isWslShellName,
@@ -194,7 +198,7 @@ export async function preparePtyIpcSpawnPreflight(ctx: PtyIpcSpawnState): Promis
   }
   ctx.isClaudeLaunch =
     !ctx.preAdoptedStablePane && !args.connectionId && isClaudeLaunchCommand(args.command)
-  if (ctx.isClaudeLaunch && isClaudeAuthSwitchInProgress()) {
+  if (ctx.isClaudeLaunch && !hasTerminalProfileBinding(args) && isClaudeAuthSwitchInProgress()) {
     throw new Error(CLAUDE_AUTH_SWITCH_IN_PROGRESS_MESSAGE)
   }
   ctx.terminalRuntimeOptions =
@@ -228,6 +232,23 @@ export async function preparePtyIpcSpawnPreflight(ctx: PtyIpcSpawnState): Promis
     ctx.cwd,
     ctx.expectedWslDistro
   )
+  ctx.profileAttachOnly =
+    hasTerminalProfileBinding(args) && !args.connectionId && args.sessionId !== undefined
+  ctx.agentProfile = await prepareTerminalProfileLaunch(args, {
+    service: ctx.deps.agentProfiles,
+    reattach: Boolean(ctx.preAdoptedStablePane) || ctx.profileAttachOnly,
+    resume: Boolean(args.resumeProviderSession),
+    isWsl: initialSelectionTarget.runtime === 'wsl',
+    cwd: ctx.cwd
+  })
+  if (ctx.profileAttachOnly) {
+    ctx.isClaudeLaunch = false
+    return
+  }
+  if (ctx.agentProfile) {
+    ctx.isClaudeLaunch = ctx.agentProfile.snapshot.agent === 'claude'
+    return
+  }
   const prepared = await prepareClaudeTerminalAuth({
     ...args,
     isClaudeLaunch: ctx.isClaudeLaunch,

@@ -1,3 +1,4 @@
+import { isAgentProfileSnapshot, type AgentProfileSnapshot } from './agent-launch-profile'
 import { z } from 'zod'
 import { isClaudeLaunchProfile, type ClaudeLaunchProfile } from './claude-launch-profile'
 import {
@@ -65,6 +66,7 @@ const sleepingAgentLaunchEnvSchema = z.preprocess(
 )
 
 const sleepingAgentLaunchConfigBaseSchema = z.object({
+  agentProfile: z.custom<AgentProfileSnapshot>(isAgentProfileSnapshot).optional(),
   claudeAccountId: z
     .string()
     .regex(/^[A-Za-z0-9_-]{1,128}$/)
@@ -90,7 +92,9 @@ export const sleepingAgentLaunchConfigSchema = z.preprocess((raw) => {
   if (
     raw &&
     typeof raw === 'object' &&
-    (('claudeProfile' in raw && raw.claudeProfile !== undefined) || 'claudeAccountId' in raw)
+    ('agentProfile' in raw ||
+      ('claudeProfile' in raw && raw.claudeProfile !== undefined) ||
+      'claudeAccountId' in raw)
   ) {
     return raw
   }

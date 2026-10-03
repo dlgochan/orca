@@ -4,6 +4,8 @@ Host service for previewing, registering and acquiring Claude/Codex launch bindi
 
 - `connection-contracts.ts`: host dependency and public operation contracts.
 - `connection-service.ts`: guarded preview, serialized save/unlink and snapshot acquisition.
+- `launch-authority.ts`: sanitized provider observation dispatch.
+- `account-removal.ts`, `preparation-error.ts`: durable launcher deletion guards and safe provider refusal reasons.
 - `provider-adapters.ts`: provider metadata and typed managed-account callback contracts.
 - `runtime-composition.ts`, `managed-provider-bindings.ts`: settings-store composition and provider-owned account preparation.
 - `terminal-command.ts`: direct argv pinning, explicit override refusal and after-shell environment binding.

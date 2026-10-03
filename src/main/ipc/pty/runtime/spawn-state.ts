@@ -1,3 +1,4 @@
+import type { PreparedAgentProfile } from '../../../agent-profiles/connection-service'
 import type { IPtyProvider, PtySpawnOptions, PtySpawnResult } from '../../../providers/types'
 import type { CodexPaneHomeRoute } from '../../../codex/codex-pane-account-registry'
 import type { CodexAccountSelectionTarget } from '../../../codex-accounts/runtime-selection'
@@ -20,6 +21,8 @@ import type {
 import { localProvider } from '../provider/registry'
 
 export type RuntimePtySpawnState = {
+  profileAttachOnly?: boolean
+  agentProfile?: PreparedAgentProfile
   releaseClaudeCredentialOwner?: () => void
   deps: PtyRuntimeControllerDeps
   args: RuntimePtySpawnArgs
@@ -86,6 +89,7 @@ export type RuntimePtySpawnState = {
 }
 
 export type RuntimePtySpawnArgs = {
+  agentProfileId?: string
   launchConfig?: SleepingAgentLaunchConfig
   cols: number
   rows: number

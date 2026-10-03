@@ -1,5 +1,6 @@
 // Pin argv before provider launch planning; bind credentials only after shell startup.
 import { isAbsolute } from 'node:path'
+import { CODEX_PROFILE_FILE_AUTH_ARGS } from '../codex-accounts/profile-config-authority'
 import { quoteStartupArg, tokenizeStartupCommand } from '../../shared/tui-agent-startup-shell'
 import type { PreparedAgentProfile } from './connection-contracts'
 
@@ -43,7 +44,10 @@ function assertArguments(agent: string, args: string[], managed: boolean): void 
     if (agent !== 'codex') {
       continue
     }
-    if (managed && /^(--oss|--local-provider)(=|$)/.test(argument)) {
+    if (
+      managed &&
+      (/^(--oss|--local-provider|--remote|--cd|-C)(=|$)/.test(argument) || /^-C./.test(argument))
+    ) {
       throw new Error('Profile commands cannot redirect the Codex provider.')
     }
     if ((argument === '-c' || argument === '--config') && !args[index + 1]) {
@@ -107,7 +111,14 @@ export function pinAgentProfileTerminalCommand(
     throw new Error('Profile command does not match its detected executable.')
   }
   assertArguments(agent, args, prepared.snapshot.binding.kind === 'managed')
-  return [executable, ...args].map((arg) => quoteStartupArg(arg, 'posix')).join(' ')
+  // The real terminal and its authority probe must select the same credential backend.
+  const authorityArgs =
+    agent === 'codex' && prepared.snapshot.binding.kind === 'managed'
+      ? CODEX_PROFILE_FILE_AUTH_ARGS
+      : []
+  return [executable, ...authorityArgs, ...args]
+    .map((arg) => quoteStartupArg(arg, 'posix'))
+    .join(' ')
 }
 
 /** Accepts only a host-generated command already validated by the pinning phase. */

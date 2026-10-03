@@ -1,6 +1,6 @@
 // Host discovery reads conventional shell files without executing their contents.
-import { constants, open } from 'node:fs/promises'
-import { basename, join } from 'node:path'
+import { access, constants, open, realpath, stat } from 'node:fs/promises'
+import { basename, isAbsolute, join } from 'node:path'
 import { resolveClaudeCommand, resolveCodexCommand } from '../../shared/node-cli-command-resolution'
 import type { ProfileAgent } from '../../shared/agent-launch-profile'
 import type { ExecutionHostId } from '../../shared/execution-host'
@@ -67,4 +67,22 @@ export async function readConventionalProfileAliases(
     }
   }
   return sources
+}
+
+export async function resolveProfileExecutable(
+  detected: string
+): Promise<{ detected: string; canonical: string }> {
+  if (!isAbsolute(detected)) {
+    throw new Error('Supported agent executable was not detected. Install the agent first.')
+  }
+  try {
+    const canonical = await realpath(detected)
+    if (!(await stat(canonical)).isFile()) {
+      throw new Error('not a file')
+    }
+    await access(canonical, constants.X_OK)
+    return { detected, canonical }
+  } catch {
+    throw new Error('Detected agent executable is unavailable.')
+  }
 }

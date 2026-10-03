@@ -1,3 +1,4 @@
+import { isAgentProfileSnapshot, type AgentProfileSnapshot } from '../agent-launch-profile'
 import { z } from 'zod'
 import { isClaudeLaunchProfile, type ClaudeLaunchProfile } from '../claude-launch-profile'
 import { OptionalFiniteNumber, OptionalString, requiredString } from './rpc-param-primitives'
@@ -162,8 +163,13 @@ export const TerminalCreateParams = z.object({
   startupCommandDelivery: z.enum(['fast', 'shell-ready']).optional(),
   env: z.record(z.string(), z.string()).optional(),
   envToDelete: z.array(z.string().min(1).max(256)).max(32).optional(),
+  agentProfileId: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,128}$/)
+    .optional(),
   launchConfig: z
     .object({
+      agentProfile: z.custom<AgentProfileSnapshot>(isAgentProfileSnapshot).optional(),
       claudeProfile: z.custom<ClaudeLaunchProfile>(isClaudeLaunchProfile).optional(),
       claudeAccountId: z
         .string()

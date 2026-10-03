@@ -1,3 +1,5 @@
+import { hasTerminalProfileBinding } from '../host-env/agent-profile-launch'
+import { prepareRuntimeAgentProfile } from './spawn-profile'
 import { inheritOmpLaunchEnvironment } from '../host-env/omp-launch-environment'
 import { prepareRuntimeClaudeAuth } from './spawn-claude-auth'
 import { isClaudeAuthSwitchInProgress } from '../../../claude-accounts/live-pty-gate'
@@ -66,7 +68,7 @@ export async function prepareRuntimePtySpawn(
   }
   ctx.isClaudeLaunch =
     !ctx.preAdoptedStablePane && !args.connectionId && isClaudeLaunchCommand(args.command)
-  if (ctx.isClaudeLaunch && isClaudeAuthSwitchInProgress()) {
+  if (ctx.isClaudeLaunch && !hasTerminalProfileBinding(args) && isClaudeAuthSwitchInProgress()) {
     throw new Error(CLAUDE_AUTH_SWITCH_IN_PROGRESS_MESSAGE)
   }
   // Why: runtime-created terminals carry no renderer-computed projectRuntime; resolve from worktreeId to honor the project's Windows runtime.
@@ -126,23 +128,29 @@ export async function prepareRuntimePtySpawn(
     ctx.cwd,
     ctx.expectedWslDistro
   )
-  const codexResumePreparation = ctx.preAdoptedStablePane
-    ? null
-    : ctx.deps.prepareCodexResumeHome({
-        connectionId: args.connectionId,
-        launchAgent: args.launchAgent,
-        providerSession: args.resumeProviderSession,
-        target: ctx.codexSelectionTarget,
-        launchEnv: args.env
-      })
+  await prepareRuntimeAgentProfile(ctx)
+  const codexResumePreparation =
+    ctx.preAdoptedStablePane || ctx.profileAttachOnly || ctx.agentProfile
+      ? null
+      : ctx.deps.prepareCodexResumeHome({
+          connectionId: args.connectionId,
+          launchAgent: args.launchAgent,
+          providerSession: args.resumeProviderSession,
+          target: ctx.codexSelectionTarget,
+          launchEnv: args.env
+        })
   const codexResumeLaunch = codexResumePreparation
     ? await ctx.deps.resolveCodexResumeLaunch(args.command, codexResumePreparation)
-    : ctx.deps.noCodexResumeLaunch(ctx.preAdoptedStablePane ? undefined : args.command)
+    : ctx.deps.noCodexResumeLaunch(
+        ctx.preAdoptedStablePane || ctx.profileAttachOnly ? undefined : args.command
+      )
   const codexResumeHome = codexResumeLaunch.codexResumeHome
   // Why: the drop still applies here, but this controller's result has no field for
   // notifyResumeUnavailable — runtime/relay panes start fresh without the notice.
   ctx.launchCommand = codexResumeLaunch.command
-  await prepareRuntimeClaudeAuth(ctx)
+  if (!ctx.agentProfile && !ctx.profileAttachOnly) {
+    await prepareRuntimeClaudeAuth(ctx)
+  }
 
   ctx.shouldPersistHostSessionBinding = args.persistHostSessionBinding === true
   if (ctx.shouldPersistHostSessionBinding) {
@@ -165,7 +173,11 @@ export async function prepareRuntimePtySpawn(
     }
   }
   const sshScopedEnv = stripRemotePaneEnvWhenHooksDisabled(args.connectionId, args.env)
-  ctx.env = ctx.claudeAuth ? { ...sshScopedEnv, ...ctx.claudeAuth.envPatch } : sshScopedEnv
+  ctx.env = ctx.agentProfile
+    ? { ...sshScopedEnv, ...ctx.agentProfile.envPatch }
+    : ctx.claudeAuth
+      ? { ...sshScopedEnv, ...ctx.claudeAuth.envPatch }
+      : sshScopedEnv
   ctx.requestedAgentTeamsPath = ctx.env?.ORCA_AGENT_TEAMS_TEAM_ID
     ? ctx.env[resolvePathEnvKey(ctx.env, process.platform)]
     : undefined
@@ -175,8 +187,11 @@ export async function prepareRuntimePtySpawn(
   }
   const selectLaunchCodexHome = async (): Promise<string | null> =>
     (await ctx.deps.getSelectedCodexHomePath?.(ctx.codexSelectionTarget, ctx.env)) ?? null
-  ctx.selectedCodexHomePath =
-    !ctx.preAdoptedStablePane && !args.connectionId
+  ctx.selectedCodexHomePath = ctx.agentProfile
+    ? ctx.agentProfile.snapshot.agent === 'codex'
+      ? ctx.agentProfile.snapshot.resolvedHome
+      : null
+    : !ctx.preAdoptedStablePane && !ctx.profileAttachOnly && !args.connectionId
       ? getCompatibleSelectedCodexHomePath(
           ctx.codexSelectionTarget,
           codexResumeHome
@@ -190,6 +205,8 @@ export async function prepareRuntimePtySpawn(
         )
       : null
   if (
+    !ctx.agentProfile &&
+    !ctx.profileAttachOnly &&
     !ctx.preAdoptedStablePane &&
     args.launchAgent === 'codex' &&
     ctx.callerRequestedSessionId === undefined
@@ -214,7 +231,12 @@ export async function prepareRuntimePtySpawn(
     })
     ctx.selectedCodexHomePath = resolution instanceof Promise ? await resolution : resolution
   }
-  if (args.launchAgent === 'codex' && ctx.selectedCodexHomePath) {
+  if (
+    !ctx.agentProfile &&
+    !ctx.profileAttachOnly &&
+    args.launchAgent === 'codex' &&
+    ctx.selectedCodexHomePath
+  ) {
     await ensureCodexStateDbBackfillRecoveryStarted(ctx.selectedCodexHomePath)
   }
   ctx.codexResumeHomeSelected = Boolean(

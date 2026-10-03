@@ -131,3 +131,14 @@ it('allows external Claude provider settings but refuses settings that can chang
     ).toThrow()
   }
 })
+
+it('pins file auth for a managed Codex terminal and refuses cwd redirection', () => {
+  const profile = prepared()
+  profile.snapshot.agent = 'codex'
+  profile.envPatch = { CODEX_HOME: '/owned' }
+  expect(prepareAgentProfileTerminalCommand(profile, 'codex').command).toContain(
+    'cli_auth_credentials_store="file"'
+  )
+  expect(() => prepareAgentProfileTerminalCommand(profile, 'codex --cd /elsewhere')).toThrow()
+  expect(() => prepareAgentProfileTerminalCommand(profile, 'codex -C/elsewhere')).toThrow()
+})

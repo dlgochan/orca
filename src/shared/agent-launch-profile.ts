@@ -123,3 +123,33 @@ export function captureAgentLaunchProfile(
   }
   return { ...profile, binding: { ...profile.binding } }
 }
+
+export function isAgentProfileSnapshot(value: unknown): value is AgentProfileSnapshot {
+  if (
+    !isAgentLaunchProfile(value) ||
+    !('resolvedHome' in value) ||
+    !isAbsoluteProfilePath(value.resolvedHome) ||
+    !('identity' in value)
+  ) {
+    return false
+  }
+  const identity = value.identity
+  if (!identity || typeof identity !== 'object' || !('kind' in identity)) {
+    return false
+  }
+  const validText = (text: unknown): text is string =>
+    typeof text === 'string' && text.length > 0 && text.length <= 4096
+  return identity.kind === 'verified'
+    ? 'subject' in identity &&
+        validText(identity.subject) &&
+        'displayName' in identity &&
+        validText(identity.displayName)
+    : identity.kind === 'unverified' && 'reason' in identity && validText(identity.reason)
+}
+
+export function copyAgentProfileSnapshot(value: AgentProfileSnapshot): AgentProfileSnapshot {
+  if (!isAgentProfileSnapshot(value)) {
+    throw new Error('Invalid saved agent profile binding. Reconnect the profile.')
+  }
+  return { ...value, binding: { ...value.binding }, identity: { ...value.identity } }
+}

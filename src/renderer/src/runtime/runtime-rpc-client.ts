@@ -1,3 +1,4 @@
+import { assertTerminalProfilesStayLocal } from '../../../shared/terminal-profile-routing'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import type { RuntimeStatus } from '../../../shared/runtime-types'
 import type { RuntimeCapability } from '../../../shared/protocol-version'
@@ -57,6 +58,9 @@ export async function callRuntimeRpc<TResult>(
     expectedEnvironmentRuntimeId?: string
   } = {}
 ): Promise<TResult> {
+  if (target.kind === 'environment') {
+    assertTerminalProfilesStayLocal(params)
+  }
   const expectedEnvironmentPairingRevision =
     target.kind === 'environment'
       ? captureRuntimeEnvironmentRequestRevision(

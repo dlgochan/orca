@@ -9,3 +9,7 @@ Defines data and pure logic shared across desktop, runtime and renderer boundari
 - `global-settings-types.ts`: persisted settings schema.
 
 Credential storage and enrollment belong to [Claude accounts](../main/claude-accounts/README.md).
+
+`agent-launch-profile.ts` validates profile snapshots; `sleeping-agent-launch-config-types.ts` and
+`sleeping-agent-launch-config.ts` define and copy durable launch bindings. `terminal-profile-routing.ts`
+refuses local-only bindings before transport to paired runtimes.

@@ -1,3 +1,4 @@
+import type { TerminalProfileService } from '../ipc/pty/host-env/agent-profile-launch'
 import { ipcMain, nativeTheme } from 'electron'
 import type { BrowserWindow, IpcMainInvokeEvent } from 'electron'
 import type { Store } from '../persistence'
@@ -57,6 +58,7 @@ export function attachMainWindowServices(
     profile?: Pick<ClaudeLaunchProfile, 'accountId'>
   ) => Promise<ClaudeRuntimeAuthPreparation>,
   options?: {
+    agentProfiles?: TerminalProfileService
     prepareCodexSessionResume?: PrepareCodexSessionResume
     awaitLocalPtyStartup?: () => Promise<void>
     awaitLocalPtyProviderStartup?: () => Promise<void>
@@ -94,6 +96,7 @@ export function attachMainWindowServices(
     prepareClaudeAuth,
     store,
     {
+      agentProfiles: options?.agentProfiles,
       prepareCodexSessionResume: options?.prepareCodexSessionResume,
       awaitLocalPtyStartup: options?.awaitLocalPtyStartup,
       awaitLocalPtyProviderStartup: options?.awaitLocalPtyProviderStartup,

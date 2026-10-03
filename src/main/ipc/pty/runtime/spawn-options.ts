@@ -1,5 +1,5 @@
+import { prepareRuntimeProfileCommand } from './spawn-profile'
 import { getAppEnvironment } from '../../../../shared/app-environment'
-import { bindClaudeProfileTerminalEnvironment } from '../../../claude-accounts/claude-profile-cli'
 import { getLegacyOpenCodeEnvKeysToDelete } from '../../../opencode/legacy-shared-config-dir'
 import type { IPtyProvider, PtySpawnResult } from '../../../providers/types'
 import { LocalPtyProvider } from '../../../providers/local-pty-provider'
@@ -26,7 +26,6 @@ import { LEGACY_TERMINAL_SHIM_REMOTE_ENV_KEYS } from '../../../pty/legacy-termin
 import { PI_PROCESS_OWNER_ENV_KEYS } from '../../../pty/pi-process-owner-env'
 import { resolveConfiguredTerminalShellArgs } from '../configured-terminal-shell-args'
 import { withCodexTerminalServerIsolationEnv } from '../../../../shared/codex-terminal-server-isolation'
-import { planCodexNoDaemonLaunch } from '../../../pty/codex-no-daemon-launch-command'
 import { resolveStablePaneOwner } from '../pane/stable-owner'
 import { getStartupTerminalIngressIntent } from '../../terminal-startup-color-query-replies'
 import {
@@ -77,6 +76,7 @@ export async function buildRuntimePtySpawnOptions(
   ctx.spawnOptions.envToDelete = mergePtyEnvDeletions(
     authEnvToDelete,
     ctx.claudeAuth?.isolatedCredentials ? CLAUDE_PROFILE_PROVIDER_ENV_VARS : [],
+    ctx.agentProfile?.envToDelete ?? [],
     args.envToDelete ?? [],
     // Persistent daemons and older SSH hosts must not resurrect a parent Pi's ownership.
     PI_PROCESS_OWNER_ENV_KEYS,
@@ -115,20 +115,15 @@ export async function buildRuntimePtySpawnOptions(
     envToDelete: ctx.spawnOptions.envToDelete
   })
   promoteAgentTeamsShimPath(ctx.env, ctx.requestedAgentTeamsPath)
-  const noDaemonLaunch = planCodexNoDaemonLaunch({
-    command: ctx.launchCommand,
-    executesOnThisHost: !args.connectionId && ctx.codexSelectionTarget.runtime !== 'wsl',
-    shellOverride: ctx.daemonShellOverride,
-    env: ctx.env,
-    envToDelete: ctx.spawnOptions.envToDelete,
-    cwd: ctx.cwd
-  })
-  const launchCommand = noDaemonLaunch ? await noDaemonLaunch : ctx.launchCommand
-  if (launchCommand !== undefined) {
-    ctx.spawnOptions.command = bindClaudeProfileTerminalEnvironment(launchCommand, ctx.claudeAuth)
-  }
+  await prepareRuntimeProfileCommand(ctx)
   if (args.commandDelivery !== undefined) {
     ctx.spawnOptions.commandDelivery = args.commandDelivery
+  }
+  if (ctx.profileAttachOnly) {
+    ctx.spawnOptions.attachOnly = true
+  }
+  if (ctx.agentProfile) {
+    ctx.spawnOptions.commandDelivery = 'provider'
   }
   if (args.startupCommandDelivery !== undefined) {
     ctx.spawnOptions.startupCommandDelivery = args.startupCommandDelivery
@@ -147,7 +142,10 @@ export async function buildRuntimePtySpawnOptions(
     worktreeId: args.worktreeId,
     cwd: ctx.cwd,
     store: ctx.deps.store,
-    isFreshLaunch: !ctx.preAdoptedStablePane && ctx.launchCommand !== undefined,
+    isFreshLaunch:
+      !ctx.preAdoptedStablePane &&
+      ctx.launchCommand !== undefined &&
+      ctx.agentProfile?.snapshot.binding.kind !== 'external',
     settings: ctx.deps.getSettings?.(),
     env: ctx.env,
     claudeAuth: ctx.claudeAuth,

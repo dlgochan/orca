@@ -1,3 +1,4 @@
+import { assertAccountHasNoAgentProfiles } from '../agent-profiles/account-removal'
 import type {
   ClaudeManagedAccount,
   ClaudeManagedAccountSummary,
@@ -54,6 +55,7 @@ export class ClaudeAccountSelection {
       throw new Error('Close Claude sessions before removing an account used by profiles.')
     }
     const settings = this.store.getSettings()
+    assertAccountHasNoAgentProfiles(settings, 'claude', accountId)
     const nextAccounts = settings.claudeManagedAccounts.filter((entry) => entry.id !== accountId)
     const nextSelection = removeClaudeAccountIdFromSelection(
       normalizeClaudeRuntimeSelection(settings),

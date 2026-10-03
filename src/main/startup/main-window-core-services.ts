@@ -116,6 +116,7 @@ export function attachMainWindowCoreServices(
         ? claudeRuntimeAuth.prepareForClaudeProfileLaunch(profile.accountId, target)
         : claudeRuntimeAuth.prepareForClaudeLaunch(target),
     {
+      agentProfiles: state.agentProfiles ?? undefined,
       prepareCodexSessionResume: prepareCodexSessionResumeForLaunch,
       awaitLocalPtyStartup: () => state.localPtyStartupReady,
       awaitLocalPtyProviderStartup: () => state.localPtyProviderStartupReady,

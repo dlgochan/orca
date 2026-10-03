@@ -88,6 +88,7 @@ export async function runPtyIpcSpawn(deps: PtySpawnIpcDeps, args: PtySpawnIpcArg
     rejectPaneSpawnReservation(ctx.paneSpawnReservationKey, ctx.paneSpawnReservation, err)
     throw err
   } finally {
+    ctx.agentProfile?.release()
     ctx.releaseClaudeCredentialOwner?.()
     ctx.releaseWorktreeSpawn?.()
     ctx.finishTerminalInstall()

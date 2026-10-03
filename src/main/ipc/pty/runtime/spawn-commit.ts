@@ -1,3 +1,4 @@
+import { hasTerminalProfileBinding } from '../host-env/agent-profile-launch'
 import { isValidTerminalTabId } from '../../../../shared/terminal-tab-id'
 import { ptyOwnership, ptyIncarnationById } from '../provider/ownership-state'
 import { ptySizes } from '../delivery/visibility-state'
@@ -102,7 +103,7 @@ export async function commitRuntimePtySpawn(ctx: RuntimePtySpawnState) {
     if (ctx.result.incarnationId) {
       ptyIncarnationById.set(ctx.result.id, ctx.result.incarnationId)
     }
-    if (!args.connectionId) {
+    if (!args.connectionId && !hasTerminalProfileBinding(args)) {
       ctx.deps.options?.onCodexHomePtySpawned?.({
         id: ctx.result.id,
         codexHomePath: ctx.selectedCodexHomePath,
@@ -218,6 +219,7 @@ export async function commitRuntimePtySpawn(ctx: RuntimePtySpawnState) {
     ptySizes.delete(ctx.effectiveSessionAppId)
   }
   recordCodexPaneAccountForSpawn({
+    agentProfile: ctx.agentProfile?.snapshot,
     ptyId: ctx.result.id,
     isDaemonHostSpawn: ctx.isDaemonHostSpawn,
     isReattach: ctx.result.isReattach === true,
@@ -233,8 +235,15 @@ export async function commitRuntimePtySpawn(ctx: RuntimePtySpawnState) {
   if (!ctx.stablePaneOwner) {
     ctx.deps.runtime?.noteTerminalSpawnCommand?.(ctx.result.id, ctx.launchCommand ?? null)
   }
-  if (ctx.isClaudeLaunch && !ctx.stablePaneOwner) {
-    markClaudePtySpawned(ctx.result.id, ctx.claudeAuth?.isolatedCredentials)
+  if (
+    ctx.isClaudeLaunch &&
+    !ctx.stablePaneOwner &&
+    ctx.agentProfile?.snapshot.binding.kind !== 'external'
+  ) {
+    markClaudePtySpawned(
+      ctx.result.id,
+      Boolean(ctx.agentProfile) || ctx.claudeAuth?.isolatedCredentials
+    )
   }
   if (args.telemetry && !ctx.stablePaneOwner) {
     recordPtySpawnTelemetry(args.telemetry)
@@ -264,7 +273,7 @@ export async function commitRuntimePtySpawn(ctx: RuntimePtySpawnState) {
   }
   // Why: runtime-owned/background spawns bypass mounted-pane state, so inventory consumers need an explicit signal.
   ctx.deps.sendPtySpawnedToRenderer(ctx.result.id)
-  if (!args.connectionId) {
+  if (!args.connectionId && !hasTerminalProfileBinding(args)) {
     ctx.deps.options?.onCodexHomePtySpawned?.({
       id: ctx.result.id,
       codexHomePath: ctx.selectedCodexHomePath,

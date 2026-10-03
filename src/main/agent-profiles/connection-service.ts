@@ -1,8 +1,9 @@
+import { validatePreparedProfileLaunch, type ProfileLaunchContext } from './launch-authority'
+import { sanitizedProfilePreparationError } from './preparation-error'
 // Resolves profile bindings on their execution host without acquiring external credentials.
-import { access, constants, realpath, stat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
-import { isAbsolute } from 'node:path'
 import {
+  captureAgentLaunchProfile,
   isAgentLaunchProfile,
   validateAgentLaunchProfileName,
   type AgentLaunchProfile,
@@ -14,7 +15,11 @@ import {
 import { parseProfileCommand } from '../agent-profile-discovery/command'
 import { discoverLiteralProfileAlias } from '../agent-profile-discovery/literal-alias'
 import { validateExternalProfileHome } from '../agent-profile-discovery/existing-home'
-import { createProfileExecutableDetector, readConventionalProfileAliases } from './host-discovery'
+import {
+  createProfileExecutableDetector,
+  readConventionalProfileAliases,
+  resolveProfileExecutable
+} from './host-discovery'
 import type { ProfilePreparationOptions } from './provider-adapters'
 
 import type {
@@ -44,19 +49,7 @@ export class AgentProfileConnectionService {
     const detected = await (
       this.dependencies.detectExecutable ?? createProfileExecutableDetector(this.dependencies.host)
     )(agent)
-    if (!isAbsolute(detected)) {
-      throw new Error('Supported agent executable was not detected. Install the agent first.')
-    }
-    try {
-      const canonical = await realpath(detected)
-      if (!(await stat(canonical)).isFile()) {
-        throw new Error('not a file')
-      }
-      await access(canonical, constants.X_OK)
-      return { detected, canonical }
-    } catch {
-      throw new Error('Detected agent executable is unavailable.')
-    }
+    return resolveProfileExecutable(detected)
   }
   private async home(path: string): Promise<string> {
     const validated = await validateExternalProfileHome(path)
@@ -79,9 +72,11 @@ export class AgentProfileConnectionService {
       if (!/^[A-Za-z0-9_-]{1,128}$/.test(input.source.accountId)) {
         throw new Error('Invalid managed account reference.')
       }
-      const observed = await adapter.inspectManaged(input.source.accountId).catch(() => {
-        throw new Error('Managed account inspection failed.')
-      })
+      const observed = await adapter
+        .inspectManaged(input.source.accountId)
+        .catch((error: unknown) => {
+          throw sanitizedProfilePreparationError(error, 'Managed account inspection failed.')
+        })
       resolvedHome = await this.home(observed.home)
       identity = this.identityMetadata(observed.identity)
       binding = { kind: 'managed', accountId: input.source.accountId }
@@ -217,6 +212,16 @@ export class AgentProfileConnectionService {
       )
     })
   }
+  validateLaunch(prepared: PreparedAgentProfile, context: ProfileLaunchContext): Promise<void> {
+    return validatePreparedProfileLaunch(this.dependencies.adapters, prepared, context)
+  }
+  async prepareById(id: string, options: ProfilePreparationOptions): Promise<PreparedAgentProfile> {
+    await this.mutations
+    return this.prepare(
+      captureAgentLaunchProfile(await this.dependencies.store.read(), id),
+      options
+    )
+  }
   async prepare(
     profile: AgentLaunchProfile | AgentProfileSnapshot,
     options: ProfilePreparationOptions
@@ -272,9 +277,11 @@ export class AgentProfileConnectionService {
         release: () => {}
       }
     }
-    const prepared = await adapter.prepareManaged(profile.binding.accountId, options).catch(() => {
-      throw new Error('Managed account preparation failed.')
-    })
+    const prepared = await adapter
+      .prepareManaged(profile.binding.accountId, options)
+      .catch((error: unknown) => {
+        throw sanitizedProfilePreparationError(error, 'Managed account preparation failed.')
+      })
     try {
       if ((await this.home(prepared.home)) !== candidate.resolvedHome) {
         throw new Error('Managed profile home changed during preparation.')
