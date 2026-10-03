@@ -1,3 +1,4 @@
+import type { AgentProfileConnectionService } from '../agent-profiles/connection-service'
 // Where the structured agent-session wire becomes a live host on this runtime.
 //
 // Built on the first `agentSession.*` call rather than at startup: the record
@@ -86,6 +87,7 @@ export function hasPersistedStructuredAgentSessionStore(
 }
 
 export type StructuredAgentSessionRuntimeDeps = {
+  agentProfiles?: AgentProfileConnectionService
   /** Host state root. The record store and the journal database both hang off it. */
   stateDirectory: string
   /** Execution host this runtime *is*. A record pinned elsewhere is not ours to
@@ -258,8 +260,10 @@ async function installOnJournal(
   const codex = new CodexStructuredSessionAdapter({
     resolveLaunch: createCodexStructuredLaunchResolver({
       store,
+      agentProfiles: deps.agentProfiles,
       resolveWorkspacePath: deps.resolveWorkspacePath,
       resolveEnvironment: resolveCodexEnvironment,
+      resolveExplicitEnvironment: deps.resolveLaunchEnvOverlay,
       ...(deps.resolveCodexPermissionPolicy
         ? { resolvePermissionPolicy: deps.resolveCodexPermissionPolicy }
         : {}),
@@ -279,6 +283,7 @@ async function installOnJournal(
     }
   })
   const claude = createStructuredClaudeRuntimeAdapter({
+    agentProfiles: deps.agentProfiles,
     store,
     resolveWorkspacePath: deps.resolveWorkspacePath,
     ...(deps.resolveClaudeCommand ? { resolveClaudeCommand: deps.resolveClaudeCommand } : {}),

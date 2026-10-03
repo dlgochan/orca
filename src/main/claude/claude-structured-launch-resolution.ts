@@ -1,3 +1,10 @@
+import { cloneClaudeProcessEnvironment as cloneDefinedEnv } from './claude-child-process-environment'
+import type { AgentProfileConnectionService } from '../agent-profiles/connection-service'
+import type { PreparedAgentProfile } from '../agent-profiles/connection-contracts'
+import {
+  structuredClaudeProfileInvocationDeps,
+  prepareStructuredProfile
+} from '../runtime/structured-agent-profile'
 import { createHash } from 'node:crypto'
 import { assertClaudeProfileCli } from '../claude-accounts/claude-profile-cli'
 import {
@@ -72,16 +79,6 @@ export const CLAUDE_STRUCTURED_BASE_OPTIONS: ClaudeStructuredSdkOptions = {
   extraArgs: { 'replay-user-messages': null }
 }
 
-function cloneDefinedEnv(env: NodeJS.ProcessEnv | Record<string, string>): Record<string, string> {
-  const next: Record<string, string> = {}
-  for (const [key, value] of Object.entries(env)) {
-    if (value !== undefined) {
-      next[key] = value
-    }
-  }
-  return next
-}
-
 /**
  * Agent Permissions as query-start options.
  *
@@ -95,6 +92,8 @@ export function claudeStructuredPermissionOptions(
 }
 
 export type ClaudeStructuredLaunch = {
+  release?: () => void
+  envToDelete?: readonly string[]
   isolatedCredentials?: boolean
   /** Always Orca's resolved user CLI: the SDK's bundled binaries are excluded from the install. */
   pathToClaudeCodeExecutable: string
@@ -113,6 +112,7 @@ export type ClaudeStructuredLaunch = {
 }
 
 export type ClaudeStructuredLaunchResolverDeps = {
+  agentProfiles?: AgentProfileConnectionService
   store: Pick<AgentSessionRecordStore, 'getRecord'>
   resolveWorkspacePath: (workspaceId: string) => Promise<string>
   resolveCommand?: () => string
@@ -274,6 +274,7 @@ export function createClaudeStructuredLaunchResolver(
     if (
       gate?.claudeProfileMigrationAt &&
       record.createdAt < gate.claudeProfileMigrationAt &&
+      !record.accountHome.agentProfile &&
       !record.accountHome.claudeProfile &&
       !record.accountHome.claudeAccountId
     ) {
@@ -282,6 +283,7 @@ export function createClaudeStructuredLaunchResolver(
       )
     }
     if (
+      !record.accountHome.agentProfile &&
       !record.accountHome.claudeProfile &&
       !record.accountHome.claudeAccountId &&
       gate !== undefined &&
@@ -320,34 +322,55 @@ export function createClaudeStructuredLaunchResolver(
     const permission = claudeStructuredPermissionOptions(
       (await deps.resolvePermissionMode?.()) ?? 'default'
     )
-    const { command, env, isolatedCredentials } = await resolveClaudeStructuredInvocation(
-      { ...deps, resolveAuthPolicy: () => deps.resolveAuthPolicy(record.accountHome) },
-      (base) =>
-        // Every structured session speaks orchestration as itself: its injected id and the Orca CLI.
-        structuredSessionChildIdentityEnv(record.sessionId, {
-          ...base,
-          // The turn translator relies on Claude's authoritative idle frame when no result arrives.
-          [CLAUDE_SESSION_STATE_EVENTS_ENV]: '1'
-        })
-    )
-    return {
-      pathToClaudeCodeExecutable: command,
-      ...(isolatedCredentials ? { isolatedCredentials: true } : {}),
-      options: {
-        ...CLAUDE_STRUCTURED_BASE_OPTIONS,
-        ...permission,
-        extraArgs: { ...CLAUDE_STRUCTURED_BASE_OPTIONS.extraArgs, ...permission.extraArgs },
-        // Claude owns where a resumed conversation continues; the stored leaf is Orca's bookkeeping.
-        ...(resumesTranscript ? { resume: providerSessionId } : { sessionId: providerSessionId })
-      },
-      cwd: await deps.resolveWorkspacePath(record.location.workspaceId),
-      env,
-      claudeConfigDir: record.accountHome.path,
-      providerSessionId,
-      resumeLeafUuid:
-        resumesTranscript && head?.handle.provider === 'claude' ? head.handle.leafUuid : null,
-      resumesTranscript,
-      continuesChain
+    let prepared: PreparedAgentProfile | undefined
+    try {
+      prepared = record.accountHome.agentProfile
+        ? await prepareStructuredProfile(
+            deps.agentProfiles,
+            record.accountHome.agentProfile,
+            continuesChain
+          )
+        : undefined
+      const profile = prepared
+      const { command, env, isolatedCredentials } = await resolveClaudeStructuredInvocation(
+        {
+          ...deps,
+          ...(profile
+            ? await structuredClaudeProfileInvocationDeps(profile, deps)
+            : { resolveAuthPolicy: () => deps.resolveAuthPolicy(record.accountHome) })
+        },
+        (base) =>
+          // Every structured session speaks orchestration as itself: its injected id and the Orca CLI.
+          structuredSessionChildIdentityEnv(record.sessionId, {
+            ...base,
+            ...(profile ? profile.envPatch : {}),
+            // The turn translator relies on Claude's authoritative idle frame when no result arrives.
+            [CLAUDE_SESSION_STATE_EVENTS_ENV]: '1'
+          })
+      )
+      return {
+        ...(prepared ? { release: prepared.release, envToDelete: prepared.envToDelete } : {}),
+        pathToClaudeCodeExecutable: command,
+        ...(isolatedCredentials ? { isolatedCredentials: true } : {}),
+        options: {
+          ...CLAUDE_STRUCTURED_BASE_OPTIONS,
+          ...permission,
+          extraArgs: { ...CLAUDE_STRUCTURED_BASE_OPTIONS.extraArgs, ...permission.extraArgs },
+          // Claude owns where a resumed conversation continues; the stored leaf is Orca's bookkeeping.
+          ...(resumesTranscript ? { resume: providerSessionId } : { sessionId: providerSessionId })
+        },
+        cwd: await deps.resolveWorkspacePath(record.location.workspaceId),
+        env,
+        claudeConfigDir: record.accountHome.path,
+        providerSessionId,
+        resumeLeafUuid:
+          resumesTranscript && head?.handle.provider === 'claude' ? head.handle.leafUuid : null,
+        resumesTranscript,
+        continuesChain
+      }
+    } catch (error) {
+      prepared?.release()
+      throw error
     }
   }
 }

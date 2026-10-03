@@ -1,4 +1,7 @@
-import { assertAccountHasNoAgentProfiles } from '../agent-profiles/account-removal'
+import {
+  assertAccountHasNoAgentProfiles,
+  assertAccountHasNoStructuredProfileOwners
+} from '../agent-profiles/account-removal'
 import type {
   ClaudeManagedAccount,
   ClaudeManagedAccountSummary,
@@ -56,6 +59,7 @@ export class ClaudeAccountSelection {
     }
     const settings = this.store.getSettings()
     assertAccountHasNoAgentProfiles(settings, 'claude', accountId)
+    await assertAccountHasNoStructuredProfileOwners('claude', accountId)
     const nextAccounts = settings.claudeManagedAccounts.filter((entry) => entry.id !== accountId)
     const nextSelection = removeClaudeAccountIdFromSelection(
       normalizeClaudeRuntimeSelection(settings),

@@ -107,7 +107,7 @@ export function pinAgentProfileTerminalCommand(
     throw new Error('Profiles require a direct agent command; shell wrappers are not supported.')
   }
   const [first, ...args] = parsed.tokens
-  if (first !== agent && first !== executable) {
+  if (first !== agent && first !== executable && first !== prepared.priorExecutable) {
     throw new Error('Profile command does not match its detected executable.')
   }
   assertArguments(agent, args, prepared.snapshot.binding.kind === 'managed')

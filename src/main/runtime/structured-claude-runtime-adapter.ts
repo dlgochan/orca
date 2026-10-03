@@ -1,3 +1,4 @@
+import type { AgentProfileConnectionService } from '../agent-profiles/connection-service'
 import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk'
 import type { AgentSessionRecord, AgentSessionAccountHome } from '../../shared/agent-session-record'
 import { resolveClaudeCommand } from '../codex-cli/command'
@@ -19,6 +20,7 @@ import type { AgentSessionRecordStore } from './agent-session-record-store'
 import { ClaudeAtRestCommandCatalog } from '../claude/claude-at-rest-commands'
 
 export type StructuredClaudeRuntimeAdapterDeps = {
+  agentProfiles?: AgentProfileConnectionService
   store: AgentSessionRecordStore
   resolveWorkspacePath: (workspaceId: string) => Promise<string>
   resolveClaudeCommand?: () => string
@@ -76,11 +78,13 @@ export function createStructuredClaudeRuntimeAdapter(
 ): ClaudeStructuredSessionAdapter {
   const { store } = deps
   return new ClaudeStructuredSessionAdapter({
+    hasProfileBinding: (sessionId) => Boolean(store.getRecord(sessionId)?.accountHome.agentProfile),
     atRestCommands: new ClaudeAtRestCommandCatalog({
       resolveWorkspacePath: deps.resolveWorkspacePath
     }),
     resolveLaunch: createClaudeStructuredLaunchResolver({
       store,
+      agentProfiles: deps.agentProfiles,
       resolveWorkspacePath: deps.resolveWorkspacePath,
       resolveCommand: deps.resolveClaudeCommand ?? resolveClaudeCommand,
       ...(deps.resolveClaudeLaunchEnv ? { resolveEnv: deps.resolveClaudeLaunchEnv } : {}),

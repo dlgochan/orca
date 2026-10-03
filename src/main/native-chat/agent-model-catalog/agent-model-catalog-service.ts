@@ -111,7 +111,8 @@ export function createAgentModelCatalogService(
         accountHomePath = resolved.path
       }
       const entry = deps.store.get(fingerprint)
-      const probe = deps.probes?.[params.agent]
+      // A bound session's live child populates its catalog; a generic probe has no profile authority.
+      const probe = scoped?.accountHome.agentProfile ? undefined : deps.probes?.[params.agent]
       if (probe && accountHomePath && deps.store.shouldRefresh(fingerprint)) {
         const home = accountHomePath
         void deps.store.refresh(fingerprint, params.agent, () => probe(home))

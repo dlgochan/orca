@@ -1,3 +1,4 @@
+import { validateResolvedProfileSnapshot } from './snapshot-resolution'
 import { validatePreparedProfileLaunch, type ProfileLaunchContext } from './launch-authority'
 import { sanitizedProfilePreparationError } from './preparation-error'
 // Resolves profile bindings on their execution host without acquiring external credentials.
@@ -222,10 +223,10 @@ export class AgentProfileConnectionService {
       options
     )
   }
-  async prepare(
+  async resolveSnapshot(
     profile: AgentLaunchProfile | AgentProfileSnapshot,
     options: ProfilePreparationOptions
-  ): Promise<PreparedAgentProfile> {
+  ): Promise<AgentProfileSnapshot> {
     this.guard()
     if (!isAgentLaunchProfile(profile) || profile.hostId !== this.dependencies.host.hostId) {
       throw new Error('Profile host or binding is invalid.')
@@ -237,42 +238,29 @@ export class AgentProfileConnectionService {
           ? { kind: 'managed', accountId: profile.binding.accountId }
           : { kind: 'home', value: profile.binding.home }
     })
-    if (candidate.executable !== profile.executable) {
-      throw new Error('Profile executable changed. Reconnect the profile.')
-    }
-    if ('resolvedHome' in profile && candidate.resolvedHome !== profile.resolvedHome) {
-      throw new Error('Profile home changed. Reconnect the profile.')
-    }
-    if (
-      'identity' in profile &&
-      profile.identity.kind === 'verified' &&
-      (candidate.identity.kind !== 'verified' ||
-        profile.identity.subject !== candidate.identity.subject)
-    ) {
-      throw new Error('Profile identity changed or cannot be verified. Reconnect the profile.')
-    }
-    if (
-      (candidate.identity.kind === 'unverified' ||
-        ('identity' in profile && profile.identity.kind === 'unverified')) &&
-      (options.resume || options.mode === 'structured')
-    ) {
-      throw new Error('Unverified identity supports fresh terminal launch only.')
-    }
-    const snapshot: AgentProfileSnapshot = {
-      id: profile.id,
-      name: profile.name,
-      agent: candidate.agent,
-      hostId: candidate.hostId,
-      executable: candidate.executable,
-      binding: { ...profile.binding },
-      resolvedHome: candidate.resolvedHome,
-      identity: { ...candidate.identity }
-    }
+    return validateResolvedProfileSnapshot(profile, candidate, options)
+  }
+  async resolveSnapshotById(
+    id: string,
+    options: ProfilePreparationOptions
+  ): Promise<AgentProfileSnapshot> {
+    await this.mutations
+    return this.resolveSnapshot(
+      captureAgentLaunchProfile(await this.dependencies.store.read(), id),
+      options
+    )
+  }
+  async prepare(
+    profile: AgentLaunchProfile | AgentProfileSnapshot,
+    options: ProfilePreparationOptions
+  ): Promise<PreparedAgentProfile> {
+    const snapshot = await this.resolveSnapshot(profile, options)
     const adapter = this.dependencies.adapters[profile.agent]
     if (profile.binding.kind === 'external') {
       return {
         snapshot,
-        envPatch: { [adapter.homeVariable]: candidate.resolvedHome },
+        priorExecutable: profile.executable,
+        envPatch: { [adapter.homeVariable]: snapshot.resolvedHome },
         envToDelete: [],
         release: () => {}
       }
@@ -283,12 +271,13 @@ export class AgentProfileConnectionService {
         throw sanitizedProfilePreparationError(error, 'Managed account preparation failed.')
       })
     try {
-      if ((await this.home(prepared.home)) !== candidate.resolvedHome) {
+      if ((await this.home(prepared.home)) !== snapshot.resolvedHome) {
         throw new Error('Managed profile home changed during preparation.')
       }
       return {
         snapshot,
-        envPatch: { ...prepared.envPatch, [adapter.homeVariable]: candidate.resolvedHome },
+        priorExecutable: profile.executable,
+        envPatch: { ...prepared.envPatch, [adapter.homeVariable]: snapshot.resolvedHome },
         envToDelete: [...new Set([...adapter.authVariables, ...prepared.envToDelete])].filter(
           (key) => key !== adapter.homeVariable
         ),

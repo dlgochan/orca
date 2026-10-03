@@ -1,4 +1,7 @@
-import { assertAccountHasNoAgentProfiles } from '../agent-profiles/account-removal'
+import {
+  assertAccountHasNoAgentProfiles,
+  assertAccountHasNoStructuredProfileOwners
+} from '../agent-profiles/account-removal'
 import { hasRecordedProfileBoundCodexAccount } from '../codex/codex-pane-account-registry'
 import type {
   CodexManagedAccount,
@@ -67,6 +70,7 @@ export class CodexAccountSelection {
     const account = this.requireAccount(accountId)
     const settings = this.dependencies.store.getSettings()
     assertAccountHasNoAgentProfiles(settings, 'codex', accountId)
+    await assertAccountHasNoStructuredProfileOwners('codex', accountId)
     if (hasRecordedProfileBoundCodexAccount(accountId)) {
       throw new Error('Close terminals using this Codex profile before removing its account.')
     }

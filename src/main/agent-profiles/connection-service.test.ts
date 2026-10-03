@@ -187,16 +187,22 @@ describe('host profile connections', () => {
     }))
     await expect(svc.save({ name: 'Overflow', connection: connection() })).rejects.toThrow(/32/)
   })
-  it('refuses changed executable and nonexecutable candidates', async () => {
+  it('pins discovered updates without changing saved ownership and refuses nonexecutables', async () => {
     const svc = service()
     const profile = await svc.save({ name: 'Work', connection: connection() })
+    const beforeUpdate = await svc.resolveSnapshotById(profile.id, {
+      resume: false,
+      mode: 'structured'
+    })
     const changed = join(root, 'other-cli')
     await writeFile(changed, 'fake')
     await chmod(changed, 0o700)
     executable = changed
-    await expect(svc.prepare(profile, { resume: false, mode: 'terminal' })).rejects.toThrow(
-      /executable changed/
-    )
+    await svc.resolveSnapshotById(profile.id, { resume: false, mode: 'structured' })
+    expect(prepareManaged).not.toHaveBeenCalled()
+    const acquired = await svc.prepare(beforeUpdate, { resume: true, mode: 'structured' })
+    expect(acquired.snapshot.executable).toBe(changed)
+    expect(profile.executable).not.toBe(changed)
     await chmod(changed, 0o600)
     await expect(svc.preview(connection())).rejects.toThrow(/unavailable/)
   })

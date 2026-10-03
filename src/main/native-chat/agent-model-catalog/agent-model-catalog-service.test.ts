@@ -215,3 +215,42 @@ describe('agent model catalog service', () => {
     })
   })
 })
+
+it('serves a common-bound session from its catalog without preparing the selected account', async () => {
+  const bound = record('/homes/pinned')
+  bound.accountHome.agentProfile = {
+    id: 'profile',
+    name: 'Original',
+    agent: 'codex',
+    hostId: 'local',
+    executable: '/trusted/codex',
+    binding: { kind: 'managed', accountId: 'original' },
+    resolvedHome: '/homes/pinned',
+    identity: { kind: 'verified', subject: 'original', displayName: 'Original' }
+  }
+  const store = new AgentModelCatalogStore()
+  const probe = vi.fn(async () => listing('selected-model'))
+  const selected = vi.fn(async () => CODEX_HOME('/homes/selected'))
+  const service = createAgentModelCatalogService({
+    store,
+    getRecord: () => bound,
+    resolveAccountHome: selected,
+    probes: { codex: probe }
+  })
+  expect(await service.read({ agent: 'codex', sessionId: bound.sessionId })).toEqual({
+    origin: 'unknown'
+  })
+  expect(probe).not.toHaveBeenCalled()
+  expect(selected).not.toHaveBeenCalled()
+  store.recordSuccess(
+    agentModelCatalogFingerprintForRecord(bound),
+    'codex',
+    listing('pinned-model')
+  )
+  expect(await service.read({ agent: 'codex', sessionId: bound.sessionId })).toMatchObject({
+    models: [{ id: 'pinned-model' }]
+  })
+  expect(probe).not.toHaveBeenCalled()
+  await service.read({ agent: 'codex' })
+  expect(probe).toHaveBeenCalledWith('/homes/selected')
+})

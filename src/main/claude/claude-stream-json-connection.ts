@@ -46,6 +46,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export type ClaudeStreamJsonLaunch = {
   isolatedCredentials?: boolean
+  envToDelete?: readonly string[]
   /** Orca's resolved user CLI; the SDK falls back to a bundled binary that is not installed. */
   pathToClaudeCodeExecutable: string
   options: ClaudeStructuredSdkOptions
@@ -133,6 +134,7 @@ export async function openClaudeStreamJsonConnection(
       // shell's: the record's pin in `launch.env` must be the only home the child sees.
       env: buildClaudeChildProcessEnv(launch.env, {
         isolatedCredentials: launch.isolatedCredentials,
+        envToDelete: launch.envToDelete,
         inheritedEnv: withoutInheritedClaudeConfigDir(process.env),
         scrubConfiguredChildSessionStamps: true
       }),

@@ -1,8 +1,15 @@
-import { afterEach, beforeEach, expect, it } from 'vitest'
+import type { AgentSessionOwnerProbe } from '../../shared/agent-session-lease-adjudication'
+import { agentSessionRecordFixture } from '../../shared/agent-session-record.test-fixture'
+import { setStructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-registry'
+import type { StructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-host'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { assertAccountHasNoAgentProfiles } from './account-removal'
+import {
+  assertAccountHasNoAgentProfiles,
+  assertAccountHasNoStructuredProfileOwners
+} from './account-removal'
 import {
   _internals,
   forgetCodexPaneAccount,
@@ -20,6 +27,7 @@ beforeEach(() => {
   _internals.resetCache()
 })
 afterEach(() => {
+  setStructuredAgentSessionHost(null)
   _internals.resetCache()
   rmSync(directory, { recursive: true, force: true })
   if (previous === undefined) {
@@ -68,3 +76,40 @@ it('refuses deletion when the ownership registry cannot be read', () => {
   writeFileSync(join(directory, 'codex-pane-accounts.json'), 'malformed')
   expect(() => hasRecordedProfileBoundCodexAccount('a')).toThrow()
 })
+
+it.each(['claude', 'codex'] as const)(
+  'protects live and uncertain structured %s ownership after unlink, but permits closed history',
+  async (agent) => {
+    const record = agentSessionRecordFixture()
+    record.accountHome.agentProfile = {
+      id: 'profile',
+      name: 'captured',
+      agent,
+      hostId: 'local',
+      executable: '/trusted/cli',
+      resolvedHome: record.accountHome.path,
+      binding: { kind: 'managed', accountId: 'one' },
+      identity: { kind: 'verified', subject: 'one', displayName: 'One' }
+    }
+    const probeOwner = vi.fn(async (): Promise<AgentSessionOwnerProbe> => ({
+      outcome: 'identity-matched',
+      matchedOn: ['spawn-token']
+    }))
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: account deletion reads only the store inventory and owner probe; registry subscriptions are optional at runtime.
+    setStructuredAgentSessionHost({
+      deps: { store: { listRecords: () => [record] }, probeOwner }
+    } as unknown as StructuredAgentSessionHost)
+    await expect(assertAccountHasNoStructuredProfileOwners(agent, 'one')).rejects.toThrow(
+      /uncertain/
+    )
+    probeOwner.mockResolvedValue({ outcome: 'indeterminate', reason: 'unknown' })
+    await expect(assertAccountHasNoStructuredProfileOwners(agent, 'one')).rejects.toThrow(
+      /uncertain/
+    )
+    await expect(assertAccountHasNoStructuredProfileOwners(agent, 'other')).resolves.toBeUndefined()
+    record.lease.ownerProcess = null
+    record.lease.claimStatus = 'released'
+    await expect(assertAccountHasNoStructuredProfileOwners(agent, 'one')).resolves.toBeUndefined()
+    expect(probeOwner).toHaveBeenCalledTimes(2)
+  }
+)

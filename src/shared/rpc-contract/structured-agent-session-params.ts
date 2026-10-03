@@ -121,6 +121,7 @@ export const ResumeSource = z
 
 export const CreateIntentParams = z
   .object({
+    agentProfileId: Identifier('Invalid agent profile id').optional(),
     claudeProfile: z.custom<ClaudeLaunchProfile>(isClaudeLaunchProfile).optional(),
     envelope: MutationEnvelope,
     worktree: Identifier('Invalid worktree selector'),

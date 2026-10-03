@@ -1,5 +1,4 @@
 // `agentSession.*` — the structured session RPC surface.
-//
 // Every method here is gated on the client advertising
 // `agent-session.structured.v1`. A client that does not is told the surface does
 // not exist rather than receiving the journal or mutation surface. Session-tab
@@ -135,10 +134,8 @@ export const STRUCTURED_AGENT_SESSION_METHODS = [
     params: CreateSupportParams,
     handler: async (params, ctx) => {
       requireStructuredCreateSupportAdmission(ctx)
-      const support = await ctx.runtime.getStructuredAgentSessionCreateSupport(
-        params.worktree,
-        params.agent
-      )
+      const { worktree, agent } = params
+      const support = await ctx.runtime.getStructuredAgentSessionCreateSupport(worktree, agent)
       // Optional: older clients ignore it, and a client seeds its picker with what create will use.
       const seedOptions = support.supported
         ? ctx.runtime.structuredAgentSessionLaunchSeedOptions(params.agent)
@@ -177,8 +174,9 @@ export const STRUCTURED_AGENT_SESSION_METHODS = [
             worktree: params.worktree,
             agent: params.agent as 'claude' | 'codex',
             caller: callerFor(ctx),
-            ...(params.resumeFrom ? { resumeFrom: params.resumeFrom } : {}),
-            ...(params.claudeProfile ? { claudeProfile: params.claudeProfile } : {}),
+            resumeFrom: params.resumeFrom,
+            agentProfileId: params.agentProfileId,
+            claudeProfile: params.claudeProfile,
             ...(params.tabId ? { tabId: params.tabId } : {})
           })
         }

@@ -141,6 +141,7 @@ export class OrcaRuntimeWithGetWorktreePs extends OrcaRuntimeWithStartTuiIdleVis
    */
   async ensureStructuredAgentSessionHost(): Promise<void> {
     await installStructuredAgentSessionHost({
+      agentProfiles: this.agentProfiles,
       stateDirectory: getProfileUserDataPath(),
       hostId: LOCAL_EXECUTION_HOST_ID,
       claimKeyId: this.agentSessionClaimSigner.keyId,

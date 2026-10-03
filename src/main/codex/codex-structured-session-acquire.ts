@@ -102,6 +102,7 @@ export async function acquireCodexStructuredSession(input: {
       })
     : null
   const open = deps.openConnection ?? openCodexAppServerConnection
+  let releaseProfile: (() => void) | undefined
   const spawnIdentity = codexSpawnedProcessIdentity(acquireInput, deps.readProcessStartTime)
   try {
     await stopSupersededCodexAcquisition({
@@ -120,11 +121,13 @@ export async function acquireCodexStructuredSession(input: {
       .catch((error: unknown) => {
         throw new AgentSessionPreSpawnError(error)
       })
+    releaseProfile = launch.release
     acquisitions.assertCurrent(sessionId, attempt)
     const connection = await open(
       {
         command: launch.command,
         args: launch.args,
+        envToDelete: launch.envToDelete,
         cwd: launch.cwd,
         env: buildCodexStructuredChildEnvironment(launch, acquireInput.spawnToken, sessionId)
       },
@@ -271,7 +274,7 @@ export async function acquireCodexStructuredSession(input: {
     return acquired
   } catch (error) {
     if (sessions.get(sessionId)?.connection !== acquisition.connection) {
-      return closeFailedCodexAcquisition({
+      return await closeFailedCodexAcquisition({
         sessionId,
         registry: acquisitions,
         attempt,
@@ -285,6 +288,7 @@ export async function acquireCodexStructuredSession(input: {
     acquisitions.deleteIfCurrent(sessionId, attempt)
     throw error
   } finally {
+    releaseProfile?.()
     attempt.finish()
   }
 }

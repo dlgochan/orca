@@ -180,7 +180,10 @@ export class OrcaRuntimeWithRestoreStructuredAgentSessionTabsOnce extends OrcaRu
       id,
       title:
         getStructuredAgentSessionHost()?.deps.store.getRecord(input.sessionId)?.accountHome
-          .claudeProfile?.name ?? defaultAgentChatLabel(input.agent),
+          .agentProfile?.name ??
+        getStructuredAgentSessionHost()?.deps.store.getRecord(input.sessionId)?.accountHome
+          .claudeProfile?.name ??
+        defaultAgentChatLabel(input.agent),
       sessionId: input.sessionId,
       ...(input.replacesSessionId ? { replacesSessionId: input.replacesSessionId } : {}),
       agent: input.agent,

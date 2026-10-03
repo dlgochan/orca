@@ -3,7 +3,8 @@
 Host service for previewing, registering and acquiring Claude/Codex launch bindings.
 
 - `connection-contracts.ts`: host dependency and public operation contracts.
-- `connection-service.ts`: guarded preview, serialized save/unlink and snapshot acquisition.
+- `connection-service.ts`: guarded preview, serialized save/unlink, read-only snapshot resolution and acquisition.
+- `snapshot-resolution.ts`: immutable home and identity checks against fresh provider observations.
 - `launch-authority.ts`: sanitized provider observation dispatch.
 - `account-removal.ts`, `preparation-error.ts`: durable launcher deletion guards and safe provider refusal reasons.
 - `provider-adapters.ts`: provider metadata and typed managed-account callback contracts.
@@ -48,3 +49,12 @@ Argument restrictions follow the binding: managed OAuth commands reject provider
 overrides, while external Codex commands retain provider/profile options. External Claude `--settings`
 accepts inline JSON after checking that its `env` cannot change `CLAUDE_CONFIG_DIR`; mutable settings
 paths and explicit settings-source changes require a separately validated launch path.
+
+Structured create uses `resolveSnapshotById` without provider preparation; acquisition prepares the
+captured snapshot. Provider, host, account, home and verified subject retain their original ownership.
+The executable in a saved snapshot records the previous observation: each acquisition discovers the
+same provider through host CLI discovery and pins its current canonical executable, allowing updates.
+A previous command path is accepted only as a validated argv label and is replaced before execution.
+
+Structured execution and pending acquisition ownership also guard account deletion after launcher
+unlink. Durable closed history alone does not retain a credential home.

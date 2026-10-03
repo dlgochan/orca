@@ -1,3 +1,8 @@
+import {
+  isAgentSessionAccountHome,
+  type AgentSessionAccountHome
+} from './agent-session-account-home'
+export type { AgentSessionAccountHome } from './agent-session-account-home'
 import { isAgentSessionRewindRecord, type AgentSessionRewindRecord } from './agent-session-rewind'
 import { isAgentSessionLaunchArgs } from './agent-session-launch-args'
 import { isAgentSessionConversationName } from './agent-session-conversation-name'
@@ -16,7 +21,6 @@ import {
  */
 
 import type { ExecutionHostId } from './execution-host'
-import { isClaudeLaunchProfile, type ClaudeLaunchProfile } from './claude-launch-profile'
 import {
   isAgentSessionConversationCommandRecord,
   type AgentSessionConversationCommandRecord
@@ -42,15 +46,6 @@ export type AgentSessionExecutionLocation = {
   wslDistro: string | null
   workspaceId: string
   workspaceKind: AgentSessionWorkspaceKind
-}
-
-/** Account root pinned at launch by the account selector, so a resume cannot drift to another login. */
-export type AgentSessionAccountHome = {
-  claudeAccountId?: string
-  claudeProfile?: ClaudeLaunchProfile
-  variable: 'CLAUDE_CONFIG_DIR' | 'CODEX_HOME'
-  /** Host-resolved absolute path in the execution host's own path syntax. */
-  path: string
 }
 
 /** Provider launch environment captured by the host when the session is created. */
@@ -160,7 +155,6 @@ export type AgentSessionOptionsReplacement = {
 }
 
 const MAX_ID_LENGTH = 512
-const MAX_PATH_LENGTH = 4096
 const MAX_LAUNCH_ENV_ENTRIES = 256
 const MAX_LAUNCH_ENV_VALUE_LENGTH = 65_536
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/
@@ -226,22 +220,6 @@ export function isAgentSessionProcessIdentity(
       (Number.isSafeInteger(identity.processStartTimeMs) &&
         (identity.processStartTimeMs as number) >= 0)) &&
     isBoundedString(identity.spawnToken, MAX_ID_LENGTH)
-  )
-}
-
-function isAgentSessionAccountHome(value: unknown): value is AgentSessionAccountHome {
-  if (typeof value !== 'object' || value === null) {
-    return false
-  }
-  const home = value as Partial<AgentSessionAccountHome>
-  return (
-    (home.variable === 'CLAUDE_CONFIG_DIR' || home.variable === 'CODEX_HOME') &&
-    (home.claudeAccountId === undefined ||
-      (home.variable === 'CLAUDE_CONFIG_DIR' &&
-        isBoundedString(home.claudeAccountId, MAX_ID_LENGTH))) &&
-    (home.claudeProfile === undefined ||
-      (home.variable === 'CLAUDE_CONFIG_DIR' && isClaudeLaunchProfile(home.claudeProfile))) &&
-    isBoundedString(home.path, MAX_PATH_LENGTH)
   )
 }
 
@@ -375,6 +353,10 @@ export function isPersistedAgentSessionRecord(
   const validated = record as AgentSessionRecord
   const head = validated.providerHandleChain.at(-1)
   return (
+    (!validated.accountHome.agentProfile ||
+      (validated.accountHome.agentProfile.agent === validated.provider &&
+        validated.accountHome.agentProfile.hostId === validated.location.executionHostId &&
+        validated.location.wslDistro === null)) &&
     validated.providerHandleChain.every((link) => link.handle.provider === validated.provider) &&
     (validated.lease.claimStatus !== 'live' ||
       (validated.lease.ownerProcess !== null &&

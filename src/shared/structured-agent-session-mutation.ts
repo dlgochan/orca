@@ -40,6 +40,7 @@ export function structuredAgentSessionDomainFingerprint(input: {
 }
 
 export function structuredAgentSessionCreateFingerprint(input: {
+  agentProfileId?: string
   claudeProfile?: ClaudeLaunchProfile
   sessionId: string
   worktree: string
@@ -52,6 +53,7 @@ export function structuredAgentSessionCreateFingerprint(input: {
     sessionId: input.sessionId,
     fields: {
       worktree: input.worktree,
+      agentProfileId: input.agentProfileId,
       claudeProfile: input.claudeProfile,
       agent: input.agent,
       // `canonicalize` drops undefined, so a plain create keeps the digest it has always had.

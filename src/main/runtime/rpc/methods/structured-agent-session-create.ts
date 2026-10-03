@@ -48,6 +48,7 @@ export type PreparedStructuredAgentSessionCreate = {
  * chat's tab holds. The canonicalizer drops `undefined`, so plain creates keep the digest they had.
  */
 export function structuredAgentSessionCreateIntentFingerprint(params: {
+  agentProfileId?: string
   claudeProfile?: ClaudeLaunchProfile
   envelope: AgentSessionMutationEnvelope
   worktree: string
@@ -60,6 +61,7 @@ export function structuredAgentSessionCreateIntentFingerprint(params: {
     sessionId: params.envelope.sessionId,
     fields: {
       worktree: params.worktree,
+      agentProfileId: params.agentProfileId,
       claudeProfile: params.claudeProfile,
       agent: params.agent,
       resumeFrom: params.resumeFrom,
@@ -71,6 +73,7 @@ export function structuredAgentSessionCreateIntentFingerprint(params: {
 /** The pre-commit half. Throws; the caller is expected to run it inside
  *  `resolveUncommittedStructuredCreate` so a failure reaches the client as a refusal. */
 export async function prepareStructuredAgentSessionCreateForWorktree(args: {
+  agentProfileId?: string
   claudeProfile?: ClaudeLaunchProfile
   runtime: OrcaRuntimeService
   /** Installs the host lazily; called at the same point the RPC handler always installed it. */
@@ -89,11 +92,12 @@ export async function prepareStructuredAgentSessionCreateForWorktree(args: {
   tabId?: string
 }): Promise<PreparedStructuredAgentSessionCreate> {
   // Adoption replay may need the record loaded from disk before source discovery can be skipped.
-  let host = args.resumeFrom ? await args.ensureHost() : null
+  let host = args.resumeFrom || args.agentProfileId !== undefined ? await args.ensureHost() : null
   const resolved = await args.runtime.resolveStructuredAgentSessionCreateIntent({
     envelope: args.envelope,
     worktree: args.worktree,
     agent: args.agent,
+    ...(args.agentProfileId !== undefined ? { agentProfileId: args.agentProfileId } : {}),
     ...(args.claudeProfile ? { claudeProfile: args.claudeProfile } : {}),
     callerKey: args.caller.callerKey,
     ...(args.resumeFrom ? { resumeFrom: args.resumeFrom } : {})

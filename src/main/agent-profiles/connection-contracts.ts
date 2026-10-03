@@ -22,6 +22,8 @@ export type AgentProfileCandidate = {
   identity: ProfileIdentity
 }
 export type PreparedAgentProfile = {
+  /** Previous host observation is accepted only as an argv label, never executed. */
+  priorExecutable?: string
   snapshot: AgentProfileSnapshot
   envPatch: Record<string, string>
   envToDelete: string[]

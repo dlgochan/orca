@@ -20,6 +20,7 @@ export type StructuredAgentSessionResumeSource = {
 }
 
 export type StructuredAgentSessionCreateParams = {
+  agentProfileId?: string
   claudeProfile?: ClaudeLaunchProfile
   envelope: AgentSessionMutationEnvelope
   worktree: string
@@ -52,6 +53,7 @@ export function isStructuredAgentSessionIdFor(agent: string, sessionId: string):
  * recomputes, so both clients build it here rather than each assembling their own.
  */
 export function structuredAgentSessionCreateParams(args: {
+  agentProfileId?: string
   claudeProfile?: ClaudeLaunchProfile
   sessionId: string
   worktree: string
@@ -62,6 +64,7 @@ export function structuredAgentSessionCreateParams(args: {
   now?: number
 }): StructuredAgentSessionCreateParams {
   const fields = {
+    ...(args.agentProfileId !== undefined ? { agentProfileId: args.agentProfileId } : {}),
     ...(args.claudeProfile ? { claudeProfile: { ...args.claudeProfile } } : {}),
     worktree: args.worktree,
     agent: args.agent,

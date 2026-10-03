@@ -2,6 +2,7 @@
 
 Defines data and pure logic shared across desktop, runtime and renderer boundaries.
 
+- `agent-session-record.ts`, `agent-session-account-home.ts`: durable conversations and validated profile ownership.
 - `agent-launch-profile.ts`: host-owned Claude/Codex bindings, normalization and session snapshot contracts.
 - `agent-launch-profile-name.ts`: shared profile name validation.
 - `claude-launch-profile.ts`: prototype Claude profile contracts.
