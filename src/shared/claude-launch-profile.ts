@@ -1,5 +1,5 @@
-import { TUI_AGENT_CONFIG } from './tui-agent-config'
-import { formatAgentTypeLabel } from './agent-type-label'
+import { validateAgentLaunchProfileName as validateClaudeLaunchProfileName } from './agent-launch-profile-name'
+export { validateClaudeLaunchProfileName }
 
 /** Named account bindings; sessions retain a copy so later edits cannot change their identity. */
 export type ClaudeLaunchProfile = {
@@ -9,13 +9,6 @@ export type ClaudeLaunchProfile = {
 }
 
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
-const RESERVED_NAMES = new Set([
-  'terminal',
-  ...Object.keys(TUI_AGENT_CONFIG).flatMap((agent) => [
-    agent,
-    formatAgentTypeLabel(agent).toLowerCase()
-  ])
-])
 
 export function isClaudeLaunchProfile(value: unknown): value is ClaudeLaunchProfile {
   return (
@@ -31,33 +24,6 @@ export function isClaudeLaunchProfile(value: unknown): value is ClaudeLaunchProf
     typeof value.name === 'string' &&
     validateClaudeLaunchProfileName(value.name, []) === null
   )
-}
-
-export function validateClaudeLaunchProfileName(
-  name: string,
-  profiles: readonly ClaudeLaunchProfile[],
-  editingId?: string
-): string | null {
-  const trimmed = name.trim()
-  if (
-    !trimmed ||
-    trimmed.length > 60 ||
-    [...name].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)
-  ) {
-    return 'Enter a profile name of 1–60 characters without control characters.'
-  }
-  if (RESERVED_NAMES.has(trimmed.toLowerCase())) {
-    return 'Choose a name different from a built-in agent.'
-  }
-  if (
-    profiles.some(
-      (profile) =>
-        profile.id !== editingId && profile.name.trim().toLowerCase() === trimmed.toLowerCase()
-    )
-  ) {
-    return 'A profile with that name already exists.'
-  }
-  return null
 }
 
 export function normalizeClaudeLaunchProfiles(value: unknown): ClaudeLaunchProfile[] {

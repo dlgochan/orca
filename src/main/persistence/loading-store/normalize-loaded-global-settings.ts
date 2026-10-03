@@ -1,4 +1,5 @@
 import { getDefaultVoiceSettings } from '../../../shared/constants'
+import { normalizeAgentLaunchProfiles } from '../../../shared/agent-launch-profile'
 import { normalizeClaudeLaunchProfiles } from '../../../shared/claude-launch-profile'
 import { normalizePRBotAuthorOverrides } from '../../../shared/pr-bot-author-overrides'
 import { normalizeTerminalQuickCommands } from '../../../shared/terminal-quick-commands'
@@ -61,6 +62,7 @@ export function normalizeLoadedGlobalSettings(
     // old default indistinguishable from a real opt-in. Preserve stored `true`; only
     // the default changed.
     ...stripRetiredGlobalSettings(parsed.settings),
+    agentLaunchProfiles: normalizeAgentLaunchProfiles(parsed.settings?.agentLaunchProfiles),
     claudeLaunchProfiles: normalizeClaudeLaunchProfiles(parsed.settings?.claudeLaunchProfiles),
     worktreeVisibilityDefaults: migratedExternalVisibility.defaults,
     prBotAuthorOverrides: normalizePRBotAuthorOverrides(parsed.settings?.prBotAuthorOverrides),

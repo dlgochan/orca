@@ -1,5 +1,6 @@
 import type { ExecutionHostId } from './execution-host'
 import type { OrcaWorkspaceLayout } from './orca-workspace-layout'
+import type { AgentLaunchProfile } from './agent-launch-profile'
 import type { ClaudeLaunchProfile } from './claude-launch-profile'
 import type { GitHubProjectSettings } from './github/project-types'
 import type { VoiceSettings } from './speech-types'
@@ -327,6 +328,7 @@ export type GlobalSettings = {
   /** Accounts own credentials; launch profiles bind named sessions to an account. */
   claudeManagedAccounts: ClaudeManagedAccount[]
   claudeLaunchProfiles?: ClaudeLaunchProfile[]
+  agentLaunchProfiles?: AgentLaunchProfile[]
   /** Legacy resumes without account ownership must stop after shared credentials are withdrawn. */
   claudeProfileMigrationAt?: number
   activeClaudeManagedAccountId: string | null
