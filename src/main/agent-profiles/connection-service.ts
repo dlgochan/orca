@@ -268,7 +268,7 @@ export class AgentProfileConnectionService {
       return {
         snapshot,
         envPatch: { [adapter.homeVariable]: candidate.resolvedHome },
-        envToDelete: [...adapter.authVariables],
+        envToDelete: [],
         release: () => {}
       }
     }

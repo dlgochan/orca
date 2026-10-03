@@ -130,7 +130,15 @@ export class ClaudeAccountRegistration {
       isolated ||
       this.dependencies.store
         .getSettings()
-        .claudeLaunchProfiles?.some((profile) => profile.accountId === accountId)
+        .claudeLaunchProfiles?.some((profile) => profile.accountId === accountId) ||
+      this.dependencies.store
+        .getSettings()
+        .agentLaunchProfiles?.some(
+          (profile) =>
+            profile.agent === 'claude' &&
+            profile.binding.kind === 'managed' &&
+            profile.binding.accountId === accountId
+        )
     if (
       bound &&
       (captured.identity.email.toLowerCase() !== account.email.toLowerCase() ||

@@ -66,6 +66,7 @@ describe('host profile connections', () => {
       const saved = await svc.save({ name: 'Work', connection: connection(agent) })
       const prepared = await svc.prepare(saved, { resume: false, mode: 'terminal' })
       expect(prepared.envPatch[agent === 'claude' ? 'CLAUDE_CONFIG_DIR' : 'CODEX_HOME']).toBe(home)
+      expect(prepared.envToDelete).toEqual([])
       await svc.unlink(saved.id)
       await expect(
         svc.prepare(prepared.snapshot, { resume: true, mode: 'structured' })

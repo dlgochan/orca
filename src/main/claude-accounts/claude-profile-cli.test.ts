@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  assertClaudeProfileCli,
   pinClaudeProfileTerminalCommand,
   supportsClaudeProfileKeychain
 } from './claude-profile-cli'
@@ -9,8 +10,31 @@ import {
 } from './claude-profile-environment'
 import { buildClaudeChildProcessEnv } from '../claude/claude-child-process-environment'
 
+vi.mock('../../shared/child-process/run-process', () => ({ runProcess: vi.fn() }))
+
 describe('Claude profile credential routing', () => {
   afterEach(() => vi.restoreAllMocks())
+  it('uses a bounded shared process probe and rejects truncated output', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    const { runProcess } = await import('../../shared/child-process/run-process')
+    vi.mocked(runProcess).mockResolvedValue({
+      code: 0,
+      signal: null,
+      stdout: '2.1.0',
+      stderr: '',
+      timedOut: false,
+      outputTruncated: true
+    })
+    await expect(assertClaudeProfileCli('/synthetic/cli')).rejects.toThrow()
+    expect(runProcess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        program: '/synthetic/cli',
+        args: ['--version'],
+        timeoutMs: 5000,
+        maxOutputBytes: 8192
+      })
+    )
+  })
   it.each(['CLAUDE_CONFIG_DIR=/other claude', 'env claude', 'claude; echo unsafe'])(
     'refuses shell routing overrides on Linux: %s',
     async (command) => {

@@ -54,7 +54,7 @@ describe('ClaudeAccountService credential capture', () => {
     }
   })
 
-  it.each([false, true])(
+  it.each([false, true, 'common-profile'])(
     'preserves credentials after rejected reauthentication (profile bound: %s)',
     async (profileBound) => {
       setPlatform('linux')
@@ -66,9 +66,14 @@ describe('ClaudeAccountService credential capture', () => {
       writeFileSync(join(managedAuthPath, '.credentials.json'), '{"old":true}\n', 'utf-8')
       writeFileSync(join(managedAuthPath, 'oauth-account.json'), '{"oldOauth":true}\n', 'utf-8')
       let settings = {
-        claudeLaunchProfiles: profileBound
-          ? [{ id: 'work', name: 'Work Claude', accountId: 'account-1' }]
-          : [],
+        claudeLaunchProfiles:
+          profileBound === true
+            ? [{ id: 'work', name: 'Work Claude', accountId: 'account-1' }]
+            : [],
+        agentLaunchProfiles:
+          profileBound === 'common-profile'
+            ? [{ agent: 'claude', binding: { kind: 'managed', accountId: 'account-1' } }]
+            : [],
         claudeManagedAccounts: [
           {
             id: 'account-1',

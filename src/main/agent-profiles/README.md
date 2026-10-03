@@ -5,6 +5,8 @@ Host service for previewing, registering and acquiring Claude/Codex launch bindi
 - `connection-contracts.ts`: host dependency and public operation contracts.
 - `connection-service.ts`: guarded preview, serialized save/unlink and snapshot acquisition.
 - `provider-adapters.ts`: provider metadata and typed managed-account callback contracts.
+- `runtime-composition.ts`, `managed-provider-bindings.ts`: settings-store composition and provider-owned account preparation.
+- `terminal-command.ts`: direct argv pinning, explicit override refusal and after-shell environment binding.
 - `host-discovery.ts`: detected CLI resolution and bounded conventional alias-file reading.
 - `*.test.ts`: synthetic filesystem and provider ownership regressions.
 
@@ -14,10 +16,12 @@ from the execution host, and a settings store that persists `agentLaunchProfiles
 profile mutation through one service instance to preserve write ordering.
 
 Managed callbacks must inspect the requested account's existing owned home without changing global
-selection, then acquire provider-owned preparation with a release handle. Claude composition belongs
-to its runtime auth service. Codex composition needs independent profile preparation: the existing
-self-contained managed-home preparation changes global selection and is unsuitable here.
+selection, then acquire provider-owned preparation with a release handle. Claude uses its runtime
+auth service and pending credential-owner lease. Codex uses `prepareForCodexProfileLaunch` in
+[its runtime home service](../codex-accounts/README.md), preserving current account selection and
+shared auth provenance. Create one `createAgentProfileConnectionService` per execution host.
 
+External preparation pins only its configuration home and preserves custom-provider authentication.
 External inspection defaults to unverified. An injected inspector must be read-only, return only
 provider identity metadata, and use fixed provider status arguments through the shared process API
 with a 5-second timeout and 64-KiB output bound. The common service neither reads tokens nor invokes
@@ -32,3 +36,8 @@ rejects conflicting explicit authentication overrides, and owns `release` until 
 cancellation. Preserve the returned snapshot in the session; prepare that snapshot for resume rather
 than looking up the current launcher. Identity inspection is a preflight observation, so another
 terminal can still change credentials after acquisition.
+
+Terminal consumers pin with `pinAgentProfileTerminalCommand`, apply provider launch planning (such
+as Codex process isolation), then call `bindAgentProfileTerminalEnvironment` with that host-generated
+command. Keep `snapshot.agent` as `launchAgent` when executable basenames differ from provider names.
+`prepareAgentProfileTerminalCommand` combines both phases for consumers without intermediate planning.

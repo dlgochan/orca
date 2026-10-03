@@ -1,13 +1,10 @@
 // Scoped Keychain support is required before a managed home can own macOS auth.
-import { execFile } from 'node:child_process'
+import { runProcess } from '../../shared/child-process/run-process'
 import { isAbsolute } from 'node:path'
-import { promisify } from 'node:util'
 import { resolveClaudeCommand } from '../../shared/node-cli-command-resolution'
 import { quoteStartupArg, tokenizeStartupCommand } from '../../shared/tui-agent-startup-shell'
 import { CLAUDE_AUTH_ENV_VARS } from './environment'
 import { CLAUDE_PROFILE_PROVIDER_ENV_VARS } from './claude-profile-environment'
-
-const run = promisify(execFile)
 
 /** Apply credential authority after interactive shell startup files have run. */
 export function bindClaudeProfileTerminalEnvironment(
@@ -38,8 +35,19 @@ export async function assertClaudeProfileCli(command = resolveClaudeCommand()): 
   if (process.platform !== 'darwin') {
     return
   }
-  const { stdout } = await run(command, ['--version'], { timeout: 5000, maxBuffer: 8192 })
-  if (!supportsClaudeProfileKeychain(stdout)) {
+  const result = await runProcess({
+    program: command,
+    args: ['--version'],
+    timeoutMs: 5000,
+    maxOutputBytes: 8192,
+    killOnOutputLimit: true
+  })
+  if (
+    result.code !== 0 ||
+    result.timedOut ||
+    result.outputTruncated ||
+    !supportsClaudeProfileKeychain(result.stdout)
+  ) {
     throw new Error(
       'Claude profiles on macOS require Claude Code 2.1 or later. Update Claude Code before launching this profile.'
     )
