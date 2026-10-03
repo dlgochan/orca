@@ -160,3 +160,73 @@ it.each([
   expect(store.getSettings()).toEqual(settings)
   expect(store.updateSettings).not.toHaveBeenCalled()
 })
+
+it.each([
+  ['personalAccessToken', 'personal_access_token'],
+  ['bedrockApiKey', 'bedrock_api_key'],
+  ['agentIdentity', 'agent_identity']
+])(
+  'refuses stale OAuth claims under active %s credentials in preview and preparation',
+  async (mode, key) => {
+    const stale = {
+      tokens: {
+        access_token: 'stale-access',
+        refresh_token: 'stale-refresh',
+        id_token: `header.${Buffer.from(JSON.stringify({ email: 'a@example.com' })).toString('base64url')}.signature`,
+        account_id: 'a'
+      }
+    }
+    const home = createManagedAuth(testState.userDataDir, 'a', JSON.stringify(stale))
+    const account = {
+      id: 'a',
+      email: 'a@example.com',
+      managedHomePath: home,
+      providerAccountId: 'a',
+      createdAt: 1,
+      updatedAt: 1,
+      lastAuthenticatedAt: 1
+    }
+    const store = createStore(
+      createSettings({ codexManagedAccounts: [account], agentLaunchProfiles: [] })
+    )
+    const { CodexRuntimeHomeService } = await import('./runtime-home-service')
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Runtime home only consumes this fixture's settings store methods.
+    const runtime = new CodexRuntimeHomeService(store as never)
+    const executable = join(testState.userDataDir, 'synthetic-cli')
+    writeFileSync(executable, 'synthetic')
+    chmodSync(executable, 0o700)
+    const profiles = createAgentProfileConnectionService({
+      store,
+      codexRuntimeHome: runtime,
+      claudeRuntimeAuth: { prepareForClaudeProfileLaunch: vi.fn() },
+      host: {
+        hostId: 'local',
+        platform: 'linux',
+        isWsl: false,
+        home: testState.fakeHomeDir,
+        shell: '/bin/bash'
+      },
+      detectExecutable: async () => executable
+    })
+    const profile = await profiles.save({
+      name: 'A',
+      connection: { agent: 'codex', source: { kind: 'managed', accountId: 'a' } }
+    })
+    writeFileSync(
+      join(home, 'auth.json'),
+      JSON.stringify({
+        ...stale,
+        auth_mode: mode,
+        [key]:
+          key === 'bedrock_api_key' ? { api_key: 'different-credential' } : 'different-credential'
+      })
+    )
+    await Promise.all([
+      expect(
+        profiles.preview({ agent: 'codex', source: { kind: 'managed', accountId: 'a' } })
+      ).rejects.toThrow(),
+      expect(profiles.prepare(profile, { mode: 'structured', resume: false })).rejects.toThrow(),
+      expect(runtime.prepareForCodexProfileLaunch('a')).rejects.toThrow()
+    ])
+  }
+)

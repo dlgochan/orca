@@ -10,7 +10,9 @@ Owns managed Codex registration, credential-home ownership and runtime account r
 
 `prepareForCodexProfileLaunch(accountId)` uses the read-only inactive-account ownership gate and
 existing resource/config mirrors. It preserves selected account and shared auth provenance; the
-CLI refreshes credentials in its own account home. Runtime consumers compose this through
+CLI refreshes credentials in its own account home. Verified profile identity requires complete OAuth
+credentials with a compatible active auth mode; stale OAuth metadata beside another credential mode
+cannot establish the profile identity. Runtime consumers compose this through
 [agent profiles](../agent-profiles/README.md). Resource and config mirroring live in `../codex/`.
 
 Managed profiles accept the default/file CLI credential store and direct OpenAI OAuth configuration.

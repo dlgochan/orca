@@ -3,22 +3,53 @@ import { isAbsolute } from 'node:path'
 import { quoteStartupArg, tokenizeStartupCommand } from '../../shared/tui-agent-startup-shell'
 import type { PreparedAgentProfile } from './connection-contracts'
 
-function assertArguments(agent: string, args: string[]): void {
+function assertExternalClaudeSettings(value: string | undefined): void {
+  let settings: unknown
+  try {
+    settings = JSON.parse(value ?? '')
+  } catch {
+    throw new Error(
+      'External Claude settings must be inline JSON so the pinned home can be validated.'
+    )
+  }
+  if (!settings || typeof settings !== 'object' || Array.isArray(settings)) {
+    throw new Error('External Claude settings must be an object.')
+  }
+  if (!('env' in settings)) {
+    return
+  }
+  const env = settings.env
+  if (
+    !env ||
+    typeof env !== 'object' ||
+    Array.isArray(env) ||
+    Object.keys(env).some((key) => key.toUpperCase() === 'CLAUDE_CONFIG_DIR')
+  ) {
+    throw new Error('External Claude settings cannot override the pinned configuration home.')
+  }
+}
+
+function assertArguments(agent: string, args: string[], managed: boolean): void {
   for (let index = 0; index < args.length; index++) {
     const argument = args[index]
     if (agent === 'claude' && /^--(settings|setting-sources)(=|$)/.test(argument)) {
-      throw new Error('Profile commands cannot override authentication settings.')
+      if (managed || argument.startsWith('--setting-sources')) {
+        throw new Error('Profile commands cannot select unvalidated authentication settings.')
+      }
+      assertExternalClaudeSettings(
+        argument === '--settings' ? args[++index] : argument.slice('--settings='.length)
+      )
     }
     if (agent !== 'codex') {
       continue
     }
-    if (/^(--oss|--local-provider)(=|$)/.test(argument)) {
+    if (managed && /^(--oss|--local-provider)(=|$)/.test(argument)) {
       throw new Error('Profile commands cannot redirect the Codex provider.')
     }
     if ((argument === '-c' || argument === '--config') && !args[index + 1]) {
       throw new Error('Codex configuration overrides require a value.')
     }
-    if (/^(--profile|-p)(=|$)/.test(argument) || /^-p./.test(argument)) {
+    if (managed && (/^(--profile|-p)(=|$)/.test(argument) || /^-p./.test(argument))) {
       throw new Error('Profile commands cannot select another Codex configuration profile.')
     }
     const config =
@@ -30,6 +61,7 @@ function assertArguments(agent: string, args: string[]): void {
             ? argument.slice(2)
             : undefined
     if (
+      managed &&
       config !== undefined &&
       !/^(model|model_reasoning_effort|approval_policy|sandbox_mode|features\.no_daemon)=/.test(
         config
@@ -74,7 +106,7 @@ export function pinAgentProfileTerminalCommand(
   if (first !== agent && first !== executable) {
     throw new Error('Profile command does not match its detected executable.')
   }
-  assertArguments(agent, args)
+  assertArguments(agent, args, prepared.snapshot.binding.kind === 'managed')
   return [executable, ...args].map((arg) => quoteStartupArg(arg, 'posix')).join(' ')
 }
 

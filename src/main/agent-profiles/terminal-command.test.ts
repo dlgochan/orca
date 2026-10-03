@@ -91,3 +91,43 @@ it('keeps quoted arguments literal and rejects Codex auth configuration override
     ).command
   ).toContain("'model_reasoning_effort=high'")
 })
+
+it.each([
+  'codex -c model_provider=custom',
+  'codex --profile work',
+  'codex --oss --local-provider ollama',
+  'codex --config cli_auth_credentials_store=keyring'
+])('preserves external Codex provider options with pinned home and executable: %s', (command) => {
+  const profile = prepared(false)
+  profile.snapshot.agent = 'codex'
+  profile.envPatch = { CODEX_HOME: '/external home' }
+  const bound = prepareAgentProfileTerminalCommand(profile, command)
+  expect(bound.launchAgent).toBe('codex')
+  expect(bound.command).toContain("'CODEX_HOME=/external home' '/bin/printf'")
+  expect(bound.command).toContain(command.split(' ').at(-1))
+  expect(() =>
+    prepareAgentProfileTerminalCommand(profile, command, { CODEX_HOME: '/other' })
+  ).toThrow()
+  expect(() =>
+    prepareAgentProfileTerminalCommand(profile, command.replace('codex', '/other/cli'))
+  ).toThrow()
+})
+
+it('allows external Claude provider settings but refuses settings that can change its home', () => {
+  const profile = prepared(false)
+  const command = `claude --settings '{"env":{"ANTHROPIC_BASE_URL":"https://custom.invalid","ANTHROPIC_API_KEY":"external"}}'`
+  expect(prepareAgentProfileTerminalCommand(profile, command).command).toContain(
+    'ANTHROPIC_BASE_URL'
+  )
+  expect(() => prepareAgentProfileTerminalCommand(prepared(), command)).toThrow()
+  for (const settings of [
+    '{"env":{"CLAUDE_CONFIG_DIR":"/other"}}',
+    '{"env":{"claude_config_dir":"/other"}}',
+    '/mutable/settings.json',
+    'invalid'
+  ]) {
+    expect(() =>
+      prepareAgentProfileTerminalCommand(profile, `claude --settings '${settings}'`)
+    ).toThrow()
+  }
+})

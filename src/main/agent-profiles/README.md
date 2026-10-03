@@ -41,3 +41,8 @@ Terminal consumers pin with `pinAgentProfileTerminalCommand`, apply provider lau
 as Codex process isolation), then call `bindAgentProfileTerminalEnvironment` with that host-generated
 command. Keep `snapshot.agent` as `launchAgent` when executable basenames differ from provider names.
 `prepareAgentProfileTerminalCommand` combines both phases for consumers without intermediate planning.
+
+Argument restrictions follow the binding: managed OAuth commands reject provider/auth configuration
+overrides, while external Codex commands retain provider/profile options. External Claude `--settings`
+accepts inline JSON after checking that its `env` cannot change `CLAUDE_CONFIG_DIR`; mutable settings
+paths and explicit settings-source changes require a separately validated launch path.
