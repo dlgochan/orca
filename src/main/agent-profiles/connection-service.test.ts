@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AgentProfileConnectionService } from './connection-service'
+import { prepareAgentProfileTerminalCommand } from './terminal-command'
+import { runProcess } from '../../shared/child-process/run-process'
 import { createClaudeProfileAdapter, createCodexProfileAdapter } from './provider-adapters'
 import type {
   AgentLaunchProfile,
@@ -76,6 +78,92 @@ describe('host profile connections', () => {
     }
   )
   it.each(['claude', 'codex'] as const)(
+    'retains an explicit custom %s home when Claude default and inherited homes exist',
+    async (agent) => {
+      await mkdir(join(root, '.claude'))
+      vi.stubEnv('CLAUDE_CONFIG_DIR', home)
+      try {
+        const svc = service()
+        const saved = await svc.save({ name: 'Custom', connection: connection(agent) })
+        const prepared = await svc.prepare(saved, { resume: false, mode: 'terminal' })
+        expect(prepared.envPatch).toEqual({
+          [agent === 'claude' ? 'CLAUDE_CONFIG_DIR' : 'CODEX_HOME']: home
+        })
+        expect(prepared.envToDelete).toEqual([])
+        expect(() =>
+          prepareAgentProfileTerminalCommand(prepared, agent, { HOME: '/external' })
+        ).not.toThrow()
+      } finally {
+        vi.unstubAllEnvs()
+      }
+    }
+  )
+  it.skipIf(process.platform === 'win32')(
+    'keeps a custom home ending in a space distinct from the default',
+    async () => {
+      await mkdir(join(root, '.claude'))
+      home = join(root, '.claude ')
+      await mkdir(home)
+      const svc = service()
+      const saved = await svc.save({ name: 'Literal path', connection: connection() })
+      const prepared = await svc.prepare(saved, { resume: false, mode: 'terminal' })
+      expect(prepared.snapshot.resolvedHome).toBe(home)
+      expect(prepared.envPatch).toEqual({ CLAUDE_CONFIG_DIR: home })
+      expect(prepared.envToDelete).toEqual([])
+    }
+  )
+  it.each(['linux', 'darwin'] as const)(
+    'preserves external Claude default credentials on %s despite inherited overrides',
+    async (platform) => {
+      home = join(root, '.claude')
+      await mkdir(home)
+      vi.stubEnv('CLAUDE_CONFIG_DIR', '/inherited/other')
+      try {
+        const svc = service({
+          host: { hostId: 'local', platform, isWsl: false, home: root, shell: '/bin/sh' }
+        })
+        const saved = await svc.save({ name: 'Default home', connection: connection() })
+        const prepared = await svc.prepare(saved, { resume: false, mode: 'terminal' })
+        expect(prepared.snapshot.resolvedHome).toBe(home)
+        expect(prepared.snapshot.binding).toEqual({ kind: 'external', home })
+        expect(prepared.envPatch).toEqual({ HOME: root })
+        expect(prepared.envToDelete).toEqual(['CLAUDE_CONFIG_DIR'])
+        const { command } = prepareAgentProfileTerminalCommand(prepared, 'claude')
+        expect(command).toContain("'-u' 'CLAUDE_CONFIG_DIR'")
+        expect(command).not.toContain('CLAUDE_CONFIG_DIR=')
+        expect(() =>
+          prepareAgentProfileTerminalCommand(prepared, 'claude', { HOME: '/wrong' })
+        ).toThrow(/override/)
+      } finally {
+        vi.unstubAllEnvs()
+      }
+    }
+  )
+  it.skipIf(process.platform === 'win32')(
+    'keeps the canonical default home bound after shell startup exports',
+    async () => {
+      await symlink(home, join(root, '.claude'))
+      const svc = service()
+      const saved = await svc.save({ name: 'Linked default', connection: connection() })
+      const prepared = await svc.prepare(saved, { resume: false, mode: 'terminal' })
+      expect(prepared.snapshot.resolvedHome).toBe(home)
+      expect(prepared.envPatch).toEqual({ HOME: root })
+      prepared.snapshot.executable = '/usr/bin/env'
+      const { command } = prepareAgentProfileTerminalCommand(prepared, 'claude')
+      const result = await runProcess({
+        program: '/bin/sh',
+        args: [
+          '-c',
+          `export HOME=/wrong CLAUDE_CONFIG_DIR=/wrong ANTHROPIC_API_KEY=external; ${command}`
+        ]
+      })
+      expect(result.code).toBe(0)
+      expect(result.stdout).not.toContain('CLAUDE_CONFIG_DIR=')
+      expect(result.stdout).toContain('ANTHROPIC_API_KEY=external')
+      expect(result.stdout.split('\n')).toContain(`HOME=${root}`)
+    }
+  )
+  it.each(['claude', 'codex'] as const)(
     'managed %s delegates preparation by account',
     async (agent) => {
       const svc = service()
@@ -116,7 +204,7 @@ describe('host profile connections', () => {
       svc.save({ id: 'missing', name: 'Missing', connection: connection() })
     ).rejects.toThrow(/no longer exists/i)
   })
-  it('snapshots survive edits and refuse identity/home changes', async () => {
+  it('snapshots survive edits and refuse identity changes', async () => {
     const svc = service()
     const saved = await svc.save({ name: 'Work', connection: connection() })
     const { snapshot } = await svc.prepare(saved, { resume: false, mode: 'terminal' })
@@ -134,13 +222,22 @@ describe('host profile connections', () => {
     await expect(svc.prepare(snapshot, { resume: true, mode: 'terminal' })).rejects.toThrow(
       /identity/i
     )
-    identity = snapshot.identity
-    await rm(home, { recursive: true })
-    await symlink(other, home)
-    await expect(svc.prepare(snapshot, { resume: false, mode: 'terminal' })).rejects.toThrow(
-      /home.*changed/i
-    )
   })
+  it.skipIf(process.platform === 'win32')(
+    'refuses a snapshot home replaced with a symlink',
+    async () => {
+      const svc = service()
+      const saved = await svc.save({ name: 'Work', connection: connection() })
+      const { snapshot } = await svc.prepare(saved, { resume: false, mode: 'terminal' })
+      const other = join(root, 'other')
+      await mkdir(other)
+      await rm(home, { recursive: true })
+      await symlink(other, home)
+      await expect(svc.prepare(snapshot, { resume: false, mode: 'terminal' })).rejects.toThrow(
+        /home.*changed/i
+      )
+    }
+  )
   it('unverified identity permits fresh terminal only', async () => {
     identity = { kind: 'unverified', reason: 'unsupported' }
     const svc = service()
@@ -187,7 +284,7 @@ describe('host profile connections', () => {
     }))
     await expect(svc.save({ name: 'Overflow', connection: connection() })).rejects.toThrow(/32/)
   })
-  it('pins discovered updates without changing saved ownership and refuses nonexecutables', async () => {
+  it('pins discovered updates without changing saved ownership', async () => {
     const svc = service()
     const profile = await svc.save({ name: 'Work', connection: connection() })
     const beforeUpdate = await svc.resolveSnapshotById(profile.id, {
@@ -206,9 +303,18 @@ describe('host profile connections', () => {
     const acquired = await svc.prepare(beforeUpdate, { resume: true, mode: 'structured' })
     expect(acquired.snapshot.executable).toBe(changed)
     expect(profile.executable).not.toBe(changed)
-    await chmod(changed, 0o600)
-    await expect(svc.preview(connection())).rejects.toThrow(/unavailable/)
   })
+  it.skipIf(process.platform === 'win32')('refuses a nonexecutable detected file', async () => {
+    await chmod(executable, 0o600)
+    await expect(service().preview(connection())).rejects.toThrow(/unavailable/)
+  })
+  it.each(['missing', 'directory'])(
+    'refuses a %s detected executable on every platform',
+    async (kind) => {
+      executable = kind === 'missing' ? join(root, 'missing-cli') : home
+      await expect(service().preview(connection())).rejects.toThrow(/unavailable/)
+    }
+  )
   it('releases managed preparation if the provider changes its home', async () => {
     const svc = service()
     const profile = await svc.save({

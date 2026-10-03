@@ -26,7 +26,9 @@ auth service and pending credential-owner lease. Codex uses `prepareForCodexProf
 [its runtime home service](../codex-accounts/README.md), preserving current account selection and
 shared auth provenance. Create one `createAgentProfileConnectionService` per execution host.
 
-External preparation pins only its configuration home and preserves custom-provider authentication.
+External preparation binds its configuration home and preserves custom-provider authentication.
+Claude's canonical default home uses the host `HOME` and removes `CLAUDE_CONFIG_DIR` after shell
+startup, preserving the CLI's default Keychain lookup. Other homes retain an explicit config-home pin.
 External inspection defaults to unverified. An injected inspector must be read-only, return only
 provider identity metadata, and use fixed provider status arguments through the shared process API
 with a 5-second timeout and 64-KiB output bound. The common service neither reads tokens nor invokes

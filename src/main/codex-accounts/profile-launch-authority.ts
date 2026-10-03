@@ -34,9 +34,13 @@ export function assertCodexProfileRoutingConfiguration(config: Record<string, un
     }
   }
   if (
-    ['openai_base_url', 'chatgpt_base_url', 'profile', 'experimental_realtime_ws_base_url'].some(
-      (key) => config[key] != null
-    ) ||
+    [
+      'openai_base_url',
+      'chatgpt_base_url',
+      'profile',
+      'experimental_realtime_ws_base_url',
+      'forced_chatgpt_workspace_id'
+    ].some((key) => config[key] != null) ||
     (config.model_providers != null &&
       (!record(config.model_providers) || 'openai' in config.model_providers))
   ) {
@@ -58,7 +62,9 @@ function assertRequirements(value: unknown): void {
     model_provider: requirements.modelProvider,
     model_providers: requirements.modelProviders,
     cli_auth_credentials_store: requirements.cliAuthCredentialsStore,
-    chatgpt_base_url: requirements.chatgptBaseUrl
+    chatgpt_base_url: requirements.chatgptBaseUrl,
+    forced_chatgpt_workspace_id:
+      requirements.forcedChatgptWorkspaceId ?? requirements.forced_chatgpt_workspace_id
   })
   if (
     requirements.allowedLoginMethods != null &&

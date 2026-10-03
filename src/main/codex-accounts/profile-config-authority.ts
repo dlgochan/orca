@@ -58,9 +58,13 @@ export function assertCodexProfileConfigFileAuthority(path: string): void {
   for (const setting of scanStructuredSettingLines(observed.value.split('\n'))) {
     const key = setting.structuredKey
     if (
-      !['cli_auth_credentials_store', 'forced_login_method', 'profile', 'model_provider'].includes(
-        key
-      )
+      ![
+        'cli_auth_credentials_store',
+        'forced_login_method',
+        'profile',
+        'model_provider',
+        'forced_chatgpt_workspace_id'
+      ].includes(key)
     ) {
       continue
     }

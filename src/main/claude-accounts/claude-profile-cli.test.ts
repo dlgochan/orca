@@ -42,6 +42,25 @@ describe('Claude profile credential routing', () => {
       await expect(pinClaudeProfileTerminalCommand(command)).rejects.toThrow('direct Claude')
     }
   )
+  it.each(['\r', '\n', '\0'])(
+    'refuses raw control characters before a CLI probe: %j',
+    async (control) => {
+      vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+      const { runProcess } = await import('../../shared/child-process/run-process')
+      vi.mocked(runProcess).mockClear()
+      await expect(
+        pinClaudeProfileTerminalCommand(`/opt/claude${control}echo injected`)
+      ).rejects.toThrow('direct Claude')
+      expect(runProcess).not.toHaveBeenCalled()
+    }
+  )
+  it('preserves exact safe raw suffix quoting and spacing', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
+    const suffix = `  --model "space model"  --prompt 'literal $HOME; data'  `
+    await expect(pinClaudeProfileTerminalCommand(`/opt/claude${suffix}`)).resolves.toBe(
+      `'/opt/claude'${suffix}`
+    )
+  })
   it('pins the executable while preserving ordinary arguments on Linux', async () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
     await expect(pinClaudeProfileTerminalCommand('/opt/claude --model sonnet')).resolves.toBe(

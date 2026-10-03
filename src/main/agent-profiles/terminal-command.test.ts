@@ -53,22 +53,25 @@ describe('profile terminal command', () => {
       })
     ).not.toThrow()
   })
-  it('restores bound home and deletions after shell startup exports', async () => {
-    const profile = prepared()
-    profile.snapshot.executable = '/usr/bin/env'
-    const { command } = prepareAgentProfileTerminalCommand(profile, 'claude')
-    const result = await runProcess({
-      program: '/bin/sh',
-      args: [
-        '-c',
-        `export CLAUDE_CONFIG_DIR=/wrong ANTHROPIC_API_KEY=wrong CLAUDE_CODE_USE_BEDROCK=1; ${command}`
-      ]
-    })
-    expect(result.code).toBe(0)
-    expect(result.stdout).toContain('CLAUDE_CONFIG_DIR=/space home')
-    expect(result.stdout).not.toContain('ANTHROPIC_API_KEY=')
-    expect(result.stdout).not.toContain('CLAUDE_CODE_USE_BEDROCK=')
-  })
+  it.skipIf(process.platform === 'win32')(
+    'restores bound home and deletions after shell startup exports',
+    async () => {
+      const profile = prepared()
+      profile.snapshot.executable = '/usr/bin/env'
+      const { command } = prepareAgentProfileTerminalCommand(profile, 'claude')
+      const result = await runProcess({
+        program: '/bin/sh',
+        args: [
+          '-c',
+          `export CLAUDE_CONFIG_DIR=/wrong ANTHROPIC_API_KEY=wrong CLAUDE_CODE_USE_BEDROCK=1; ${command}`
+        ]
+      })
+      expect(result.code).toBe(0)
+      expect(result.stdout).toContain('CLAUDE_CONFIG_DIR=/space home')
+      expect(result.stdout).not.toContain('ANTHROPIC_API_KEY=')
+      expect(result.stdout).not.toContain('CLAUDE_CODE_USE_BEDROCK=')
+    }
+  )
 })
 
 it('keeps quoted arguments literal and rejects Codex auth configuration overrides', () => {

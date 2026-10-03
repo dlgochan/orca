@@ -108,7 +108,9 @@ describe('managed Codex effective launch authority', () => {
     { model_providers: { openai: { base_url: 'SECRET_SENTINEL' } } },
     { openai_base_url: 'SECRET_SENTINEL' },
     { chatgpt_base_url: 'https://example.invalid/backend-api/' },
-    { cli_auth_credentials_store: 'keyring' }
+    { cli_auth_credentials_store: 'keyring' },
+    { forced_chatgpt_workspace_id: 'workspace-other' },
+    { forced_chatgpt_workspace_id: ['workspace-other'] }
   ])('refuses effective workspace/provider routing %j', async (override) => {
     const p = probe({
       ...valid(),
@@ -118,6 +120,55 @@ describe('managed Codex effective launch authority', () => {
       observeCodexProfileLaunchAuthority({ snapshot, cwd: '/workspace', env: {} }, p.runSession)
     ).rejects.toThrow(/direct OpenAI OAuth/)
     expect(p.requests).not.toHaveBeenCalledWith('account/read', expect.anything())
+  })
+  it.each(['system', 'user', 'project', 'mdm'])(
+    'refuses original %s workspace restrictions even if effective config hides them',
+    async (type) => {
+      const p = probe({
+        ...valid(),
+        'config/read': {
+          config,
+          origins: {},
+          layers: [{ name: { type }, config: { forced_chatgpt_workspace_id: 'other' } }]
+        }
+      })
+      await expect(
+        observeCodexProfileLaunchAuthority({ snapshot, cwd: '/workspace', env: {} }, p.runSession)
+      ).rejects.toMatchObject({ code: 'codex_config' })
+      expect(p.requests).not.toHaveBeenCalledWith('account/read', expect.anything())
+    }
+  )
+  it.each(['forcedChatgptWorkspaceId', 'forced_chatgpt_workspace_id'])(
+    'refuses workspace restrictions in requirements field %s',
+    async (key) => {
+      const p = probe({
+        ...valid(),
+        'configRequirements/read': { requirements: { [key]: 'other' } }
+      })
+      await expect(
+        observeCodexProfileLaunchAuthority({ snapshot, cwd: '/workspace', env: {} }, p.runSession)
+      ).rejects.toMatchObject({ code: 'codex_config' })
+      expect(p.requests).not.toHaveBeenCalledWith('account/read', expect.anything())
+    }
+  )
+  it('ignores disabled workspace restrictions and accepts absent effective restrictions', async () => {
+    const p = probe({
+      ...valid(),
+      'config/read': {
+        config: { ...config, forced_chatgpt_workspace_id: null },
+        origins: {},
+        layers: [
+          {
+            name: { type: 'project' },
+            config: { forced_chatgpt_workspace_id: 'other' },
+            disabledReason: 'untrusted'
+          }
+        ]
+      }
+    })
+    await expect(
+      observeCodexProfileLaunchAuthority({ snapshot, cwd: '/workspace', env: {} }, p.runSession)
+    ).resolves.toBeUndefined()
   })
   it('refuses enterprise auth routing even when config looks ordinary', async () => {
     const p = probe({

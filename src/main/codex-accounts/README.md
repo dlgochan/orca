@@ -17,7 +17,7 @@ cannot establish the profile identity. Runtime consumers compose this through
 [agent profiles](../agent-profiles/README.md). Resource and config mirroring live in `../codex/`.
 
 Managed profiles accept the default/file CLI credential store and direct OpenAI OAuth configuration.
-Conflicting provider, selected config profile, login method or credential-store settings are refused
+Conflicting provider, selected config profile, forced workspace, login method or credential-store settings are refused
 before resource/config mirroring; external profile configuration remains user-owned.
 
 Managed terminal launches inspect effective cwd configuration and policy using the existing app-server

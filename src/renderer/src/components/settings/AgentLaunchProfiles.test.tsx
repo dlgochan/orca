@@ -122,6 +122,37 @@ describe.each(['claude', 'codex'] as const)('%s shared profile form', (agent) =>
     expect(select).not.toHaveBeenCalled()
     expect(remove).not.toHaveBeenCalled()
   })
+  it('coalesces same-render sign-in clicks and selects each sequentially added account', async () => {
+    let finish!: (value: { accounts: { id: string; email: string }[] }) => void
+    const add = agent === 'claude' ? addClaude : addCodex
+    add.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve
+        })
+    )
+    setup(agent)
+    const signIn = screen.getByRole('button', { name: 'Sign in to another account' })
+    act(() => {
+      fireEvent.click(signIn)
+      fireEvent.click(signIn)
+    })
+    expect(add).toHaveBeenCalledOnce()
+    const first = { id: 'a', email: 'first@example.test' }
+    await act(async () => finish({ accounts: [first] }))
+    expect(screen.getByRole('combobox').textContent).toContain(first.email)
+    add.mockResolvedValueOnce({ accounts: [first, { id: 'b', email: 'second@example.test' }] })
+    fireEvent.click(signIn)
+    await waitFor(() =>
+      expect(screen.getByRole('combobox').textContent).toContain('second@example.test')
+    )
+    expect(add).toHaveBeenCalledTimes(2)
+    preview.mockResolvedValue(candidate(agent))
+    fireEvent.click(screen.getByRole('button', { name: 'Check connection' }))
+    await waitFor(() =>
+      expect(preview).toHaveBeenCalledWith({ agent, source: { kind: 'managed', accountId: 'b' } })
+    )
+  })
   it('offers folder fallback for an unresolved alias and invalidates a changed preview', async () => {
     preview.mockRejectedValueOnce(
       new Error('Command cannot be safely resolved. Choose a configuration folder.')

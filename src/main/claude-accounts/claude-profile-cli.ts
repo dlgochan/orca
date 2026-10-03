@@ -62,7 +62,12 @@ export async function pinClaudeProfileTerminalCommand(
     throw new Error('Claude launch profiles currently require macOS or Linux.')
   }
   const parsed = tokenizeStartupCommand(command ?? '', 'posix')
-  if (!parsed.ok || !parsed.tokens.length || parsed.spans.some((span) => span.divergesFromShell)) {
+  if (
+    !parsed.ok ||
+    !parsed.tokens.length ||
+    parsed.spans.some((span) => span.divergesFromShell) ||
+    /[\r\n\0]/.test(command ?? '')
+  ) {
     throw new Error(
       'Claude profiles require a direct Claude command; shell wrappers are not supported.'
     )

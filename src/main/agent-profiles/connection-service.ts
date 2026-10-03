@@ -9,6 +9,8 @@ import { validatePreparedProfileLaunch, type ProfileLaunchContext } from './laun
 import { sanitizedProfilePreparationError } from './preparation-error'
 // Resolves profile bindings on their execution host without acquiring external credentials.
 import { randomUUID } from 'node:crypto'
+import { join } from 'node:path'
+import { claudeConfigDirEnvPatch } from '../claude/claude-config-dir-pin'
 import {
   captureAgentLaunchProfile,
   isAgentLaunchProfile,
@@ -267,11 +269,24 @@ export class AgentProfileConnectionService {
     const snapshot = await this.resolveSnapshot(profile, options)
     const adapter = this.dependencies.adapters[profile.agent]
     if (profile.binding.kind === 'external') {
+      let envPatch: Record<string, string> = { [adapter.homeVariable]: snapshot.resolvedHome }
+      if (profile.agent === 'claude') {
+        const host = this.dependencies.host
+        const defaultHome = await validateExternalProfileHome(join(host.home, '.claude'))
+        if (defaultHome.ok && defaultHome.home === snapshot.resolvedHome) {
+          // Compare canonical default identity without inheriting a shell config-home override.
+          envPatch = claudeConfigDirEnvPatch(snapshot.resolvedHome, {
+            env: { CLAUDE_CONFIG_DIR: defaultHome.home },
+            platform: host.platform
+          })
+        }
+      }
+      const usesDefaultHome = !(adapter.homeVariable in envPatch)
       return {
         snapshot,
         priorExecutable: profile.executable,
-        envPatch: { [adapter.homeVariable]: snapshot.resolvedHome },
-        envToDelete: [],
+        envPatch: usesDefaultHome ? { HOME: this.dependencies.host.home } : envPatch,
+        envToDelete: usesDefaultHome ? [adapter.homeVariable] : [],
         release: () => {}
       }
     }

@@ -89,6 +89,16 @@ it('prepares independent A/B homes without changing selected C, shared auth, or 
   expect(claude.prepareForClaudeProfileLaunch).not.toHaveBeenCalled()
   expect(store.getSettings().activeCodexManagedAccountId).toBe('c')
   store.updateSettings.mockClear()
+  const refreshed = JSON.parse(before[0])
+  refreshed.tokens.access_token = 'rotated-access'
+  refreshed.tokens.refresh_token = 'rotated-refresh'
+  writeFileSync(join(accounts[0].managedHomePath, 'auth.json'), JSON.stringify(refreshed))
+  const resumed = await profiles.prepare(bound.snapshot, { resume: true, mode: 'structured' })
+  expect(resumed.snapshot.identity).toEqual(bound.snapshot.identity)
+  expect(readFileSync(join(accounts[0].managedHomePath, 'auth.json'), 'utf8')).toBe(
+    JSON.stringify(refreshed)
+  )
+  resumed.release()
   const changed = JSON.parse(before[0])
   changed.tokens.account_id = 'changed'
   writeFileSync(join(accounts[0].managedHomePath, 'auth.json'), JSON.stringify(changed))
@@ -121,7 +131,11 @@ it.each([
   'cli_auth_credentials_store = "auto"',
   'cli_auth_credentials_store = "ephemeral"',
   '"cli_auth_credentials_store" = "keyring"',
-  'forced_login_method = "api"'
+  'forced_login_method = "api"',
+  'forced_chatgpt_workspace_id = "other"',
+  '"forced_chatgpt_workspace_id" = "other"',
+  'forced_chatgpt_workspace_id = ["other"]',
+  'forced_chatgpt_workspace_id = """\nother\n"""'
 ])('refuses changed global auth routing before touching the profile home: %s', async (config) => {
   const home = createManagedAuth(
     testState.userDataDir,

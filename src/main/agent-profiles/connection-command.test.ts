@@ -17,8 +17,7 @@ describe('explicit command home resolution', () => {
     canonicalExecutable = join(root, 'versioned-cli')
     await writeFile(canonicalExecutable, 'synthetic executable')
     await chmod(canonicalExecutable, 0o700)
-    detectedExecutable = join(root, 'claude')
-    await symlink(canonicalExecutable, detectedExecutable)
+    detectedExecutable = canonicalExecutable
   })
   afterEach(async () => {
     await rm(root, { recursive: true, force: true })
@@ -36,21 +35,35 @@ describe('explicit command home resolution', () => {
       store: { read: () => [], write: vi.fn() }
     })
   }
-  it('resolves explicit assignment with trusted detected symlink and pins its canonical target', async () => {
-    const candidate = await service().preview({
-      agent: 'claude',
-      source: { kind: 'command', value: `CLAUDE_CONFIG_DIR="${home}" "${detectedExecutable}"` }
-    })
-    expect(candidate.executable).toBe(canonicalExecutable)
-    expect(candidate.resolvedHome).toBe(home)
-  })
-  it('accepts explicit home assignment with the trusted canonical executable', async () => {
-    const candidate = await service().preview({
-      agent: 'claude',
-      source: { kind: 'command', value: `CLAUDE_CONFIG_DIR="${home}" "${canonicalExecutable}"` }
-    })
-    expect(candidate.executable).toBe(canonicalExecutable)
-    expect(candidate.resolvedHome).toBe(home)
+  it.skipIf(process.platform === 'win32')(
+    'resolves explicit assignment with trusted detected symlink and pins its canonical target',
+    async () => {
+      detectedExecutable = join(root, 'claude')
+      await symlink(canonicalExecutable, detectedExecutable)
+      const candidate = await service().preview({
+        agent: 'claude',
+        source: { kind: 'command', value: `CLAUDE_CONFIG_DIR="${home}" "${detectedExecutable}"` }
+      })
+      expect(candidate.executable).toBe(canonicalExecutable)
+      expect(candidate.resolvedHome).toBe(home)
+    }
+  )
+  it.skipIf(process.platform === 'win32')(
+    'accepts explicit home assignment with the trusted canonical executable',
+    async () => {
+      const candidate = await service().preview({
+        agent: 'claude',
+        source: { kind: 'command', value: `CLAUDE_CONFIG_DIR="${home}" "${canonicalExecutable}"` }
+      })
+      expect(candidate.executable).toBe(canonicalExecutable)
+      expect(candidate.resolvedHome).toBe(home)
+    }
+  )
+  it('resolves a leading home tilde in folder selection', async () => {
+    expect(
+      (await service().preview({ agent: 'claude', source: { kind: 'home', value: '~/account' } }))
+        .resolvedHome
+    ).toBe(home)
   })
   it('requires folder selection for every command without an explicit home, including a shadowed CLI', async () => {
     await mkdir(join(root, '.claude'))
@@ -61,19 +74,18 @@ describe('explicit command home resolution', () => {
       ).rejects.toThrow(/folder/i)
     }
   })
-  it('resolves literal aliases, explicit assignments and leading home tilde', async () => {
-    const svc = service()
-    for (const value of ['work', `CLAUDE_CONFIG_DIR="${home}" claude`]) {
-      expect(
-        (await svc.preview({ agent: 'claude', source: { kind: 'command', value } })).resolvedHome
-      ).toBe(home)
+  it.skipIf(process.platform === 'win32')(
+    'resolves literal aliases and explicit assignments',
+    async () => {
+      const svc = service()
+      for (const value of ['work', `CLAUDE_CONFIG_DIR="${home}" claude`]) {
+        expect(
+          (await svc.preview({ agent: 'claude', source: { kind: 'command', value } })).resolvedHome
+        ).toBe(home)
+      }
+      await expect(
+        svc.preview({ agent: 'claude', source: { kind: 'command', value: 'claude --resume' } })
+      ).rejects.toThrow(/folder/i)
     }
-    expect(
-      (await svc.preview({ agent: 'claude', source: { kind: 'home', value: '~/account' } }))
-        .resolvedHome
-    ).toBe(home)
-    await expect(
-      svc.preview({ agent: 'claude', source: { kind: 'command', value: 'claude --resume' } })
-    ).rejects.toThrow(/folder/i)
-  })
+  )
 })

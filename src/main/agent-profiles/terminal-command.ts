@@ -81,7 +81,11 @@ export function assertAgentProfileEnvironment(
   env: Record<string, string> = {}
 ): void {
   const homeVariable = prepared.snapshot.agent === 'claude' ? 'CLAUDE_CONFIG_DIR' : 'CODEX_HOME'
-  const forbidden = new Set([homeVariable, ...prepared.envToDelete])
+  const forbidden = new Set([
+    homeVariable,
+    ...prepared.envToDelete,
+    ...Object.keys(prepared.envPatch)
+  ])
   for (const key of Object.keys(env)) {
     if (forbidden.has(key.toUpperCase())) {
       throw new Error(`Remove the ${key} override before launching this profile.`)
