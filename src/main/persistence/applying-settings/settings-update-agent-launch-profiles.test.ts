@@ -56,15 +56,16 @@ describe('updateSettings agentLaunchProfiles', () => {
     expect(operations.state.settings.agentLaunchProfiles).toEqual([{ ...profile, name: 'Work' }])
   })
 
-  it('clears explicitly undefined profiles and preserves the prototype field separately', () => {
+  it('clears explicitly undefined profiles without converting prototype bindings', () => {
     const operations = makeOperations()
-    const legacy = [{ id: 'legacy', name: 'Legacy', accountId: 'account-a' }]
-    updateSettings(operations, {
-      claudeLaunchProfiles: legacy,
+    const prototype = [{ id: 'prototype', name: 'Prototype', accountId: 'account-a' }]
+    const oldSettings = {
+      claudeLaunchProfiles: prototype,
       agentLaunchProfiles: normalizeAgentLaunchProfiles([profile])
-    })
+    }
+    updateSettings(operations, oldSettings)
     updateSettings(operations, { agentLaunchProfiles: undefined })
     expect(operations.state.settings.agentLaunchProfiles).toEqual([])
-    expect(operations.state.settings.claudeLaunchProfiles).toEqual(legacy)
+    expect(operations.state.settings).not.toHaveProperty('claudeLaunchProfiles')
   })
 })

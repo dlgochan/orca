@@ -1,5 +1,6 @@
+import { profileRequiresFreshTerminal } from '../../../shared/agent-profile-capabilities'
 import { isAgentSessionHandleProvider } from '../../../shared/agent-session-provider-handle'
-import type { ClaudeLaunchProfile } from '../../../shared/claude-launch-profile'
+import type { AgentLaunchProfile } from '../../../shared/agent-launch-profile'
 import type { StructuredAgentSessionResumeSource } from '../../../shared/structured-agent-session-create'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import {
@@ -23,7 +24,7 @@ import {
 import type { StructuredAgentLaunchOptions } from '@/lib/structured-agent-session-launch'
 
 export type AgentSessionLaunchRequest = AgentLaunchRouteArgs & {
-  claudeProfile?: ClaudeLaunchProfile
+  agentProfile?: AgentLaunchProfile
   resumeFrom?: StructuredAgentSessionResumeSource
   onPromptDelivered?: () => void
 }
@@ -34,7 +35,7 @@ export type AgentSessionLaunchRequest = AgentLaunchRouteArgs & {
  * (or a retry within the same session) re-enters here without re-resolving.
  */
 export type AgentSessionLaunchVerdict = {
-  claudeProfile?: ClaudeLaunchProfile
+  agentProfile?: AgentLaunchProfile
   route: AgentLaunchRoute
   agent: TuiAgent
   worktreeId?: string
@@ -70,7 +71,7 @@ export type AgentSessionLaunchPlan = Readonly<AgentSessionLaunchVerdict> & {
 
 function structuredLaunchOptions(verdict: AgentSessionLaunchVerdict): StructuredAgentLaunchOptions {
   return {
-    ...(verdict.claudeProfile ? { claudeProfile: verdict.claudeProfile } : {}),
+    ...(verdict.agentProfile ? { agentProfile: verdict.agentProfile } : {}),
     ...(verdict.prompt !== undefined ? { prompt: verdict.prompt } : {}),
     ...(verdict.promptDelivery ? { promptDelivery: verdict.promptDelivery } : {}),
     ...(verdict.resumeFrom ? { resumeFrom: verdict.resumeFrom } : {}),
@@ -133,8 +134,11 @@ export function planAgentSessionLaunch(
   request: AgentSessionLaunchRequest
 ): AgentSessionLaunchPlan {
   return adoptAgentSessionLaunchVerdict({
-    ...(request.claudeProfile ? { claudeProfile: request.claudeProfile } : {}),
-    route: resolveAgentLaunchRoute(buildAgentLaunchRouteInput(store, request)),
+    ...(request.agentProfile ? { agentProfile: request.agentProfile } : {}),
+    route:
+      request.agentProfile && profileRequiresFreshTerminal(request.agentProfile.binding)
+        ? 'terminal-tui'
+        : resolveAgentLaunchRoute(buildAgentLaunchRouteInput(store, request)),
     agent: request.agent,
     ...(request.workspace.worktreeId ? { worktreeId: request.workspace.worktreeId } : {}),
     ...(request.prompt !== undefined ? { prompt: request.prompt } : {}),

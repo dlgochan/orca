@@ -23,9 +23,6 @@ export function agentSessionRecordIdentityFields(
       ...identity.accountHome,
       ...(identity.accountHome.agentProfile
         ? { agentProfile: copyAgentProfileSnapshot(identity.accountHome.agentProfile) }
-        : {}),
-      ...(identity.accountHome.claudeProfile
-        ? { claudeProfile: { ...identity.accountHome.claudeProfile } }
         : {})
     },
     ...(identity.options ? { options: { ...identity.options } } : {}),

@@ -83,7 +83,6 @@ export function bindBuildColdRestoreAgentResumeStartup(session: ConnectPanePtySe
     const startupPlan = buildAgentResumeStartupPlan({
       agent,
       agentProfile: launchConfig?.agentProfile,
-      claudeProfile: launchConfig?.claudeProfile,
       claudeAccountId: launchConfig?.claudeAccountId,
       providerSession,
       cmdOverrides: state.settings?.agentCmdOverrides ?? {},

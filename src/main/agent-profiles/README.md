@@ -2,7 +2,7 @@
 
 Host service for previewing, registering and acquiring Claude/Codex launch bindings.
 
-- `connection-contracts.ts`: host dependency and public operation contracts.
+- `connection-contracts.ts`: host dependencies; public DTOs live in `../../shared/agent-profile-connection.ts`.
 - `connection-service.ts`: guarded preview, serialized save/unlink, read-only snapshot resolution and acquisition.
 - `snapshot-resolution.ts`: immutable home and identity checks against fresh provider observations.
 - `launch-authority.ts`: sanitized provider observation dispatch.
@@ -16,7 +16,9 @@ Host service for previewing, registering and acquiring Claude/Codex launch bindi
 Discovery uses [agent-profile-discovery](../agent-profile-discovery/README.md); persisted profiles
 and immutable session bindings use `../../shared/agent-launch-profile.ts`. Inject host context
 from the execution host, and a settings store that persists `agentLaunchProfiles`. Route every
-profile mutation through one service instance to preserve write ordering.
+profile mutation through one service instance to preserve write ordering. The typed
+`ipc/agent-profiles.ts` handlers use this same instance; generic renderer settings updates cannot
+write the profile catalog.
 
 Managed callbacks must inspect the requested account's existing owned home without changing global
 selection, then acquire provider-owned preparation with a release handle. Claude uses its runtime

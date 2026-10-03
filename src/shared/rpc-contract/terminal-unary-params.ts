@@ -1,6 +1,5 @@
 import { isAgentProfileSnapshot, type AgentProfileSnapshot } from '../agent-launch-profile'
 import { z } from 'zod'
-import { isClaudeLaunchProfile, type ClaudeLaunchProfile } from '../claude-launch-profile'
 import { OptionalFiniteNumber, OptionalString, requiredString } from './rpc-param-primitives'
 import { isTuiAgent } from '../tui-agent-config'
 import {
@@ -170,7 +169,6 @@ export const TerminalCreateParams = z.object({
   launchConfig: z
     .object({
       agentProfile: z.custom<AgentProfileSnapshot>(isAgentProfileSnapshot).optional(),
-      claudeProfile: z.custom<ClaudeLaunchProfile>(isClaudeLaunchProfile).optional(),
       claudeAccountId: z
         .string()
         .regex(/^[A-Za-z0-9_-]{1,128}$/)

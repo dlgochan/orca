@@ -275,7 +275,6 @@ export function createClaudeStructuredLaunchResolver(
       gate?.claudeProfileMigrationAt &&
       record.createdAt < gate.claudeProfileMigrationAt &&
       !record.accountHome.agentProfile &&
-      !record.accountHome.claudeProfile &&
       !record.accountHome.claudeAccountId
     ) {
       throw new AgentSessionPreSpawnError(
@@ -284,7 +283,6 @@ export function createClaudeStructuredLaunchResolver(
     }
     if (
       !record.accountHome.agentProfile &&
-      !record.accountHome.claudeProfile &&
       !record.accountHome.claudeAccountId &&
       gate !== undefined &&
       !structuredClaudeMatchesActiveManagedAccount(gate)

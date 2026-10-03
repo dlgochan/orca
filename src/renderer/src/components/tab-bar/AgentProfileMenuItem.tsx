@@ -1,34 +1,36 @@
 import { Loader2 } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
-import type { ClaudeLaunchProfile } from '../../../../shared/claude-launch-profile'
+import type { AgentLaunchProfile } from '../../../../shared/agent-launch-profile'
 import { AgentIcon } from '@/lib/agent-catalog'
 import { useStructuredAgentLaunchStatus } from '@/lib/structured-agent-session-launch-status'
 import { DropdownMenuItem } from '../ui/dropdown-menu'
-
-export function ClaudeProfileMenuItem({
+export function AgentProfileMenuItem({
   profile,
   worktreeId,
-  email,
+  label,
   disabled,
   onSelect
 }: {
-  profile: ClaudeLaunchProfile
+  profile: AgentLaunchProfile
   worktreeId: string
-  email?: string
+  label?: string
   disabled: boolean
   onSelect: () => void
 }) {
-  const pending = useStructuredAgentLaunchStatus(worktreeId, 'claude', profile) === 'pending'
+  const pending = useStructuredAgentLaunchStatus(worktreeId, profile.agent, profile) === 'pending'
   return (
     <DropdownMenuItem disabled={disabled || pending} onSelect={onSelect}>
       {pending ? (
         <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
       ) : (
-        <AgentIcon agent="claude" size={14} />
+        <AgentIcon agent={profile.agent} size={14} />
       )}
       <span className="flex-1">{profile.name}</span>
       <span className="truncate text-xs text-muted-foreground">
-        {email ?? translate('claudeProfiles.unavailable', 'Account unavailable')}
+        {profile.binding.kind === 'external'
+          ? translate('agentProfiles.unverified', 'Unverified configuration')
+          : (label ??
+            translate('agentProfiles.unavailable', 'Account unavailable — edit to reconnect'))}
       </span>
     </DropdownMenuItem>
   )

@@ -39,7 +39,6 @@ import { startFolderRepoGitUpgradeWatch } from '../ipc/folder-repo-git-upgrade'
 import { scheduleMainWindowAutoUpdaterSetup } from './main-window-updater'
 import { registerRuntimeWindowLifecycle } from './runtime-window-lifecycle'
 import { registerFileDropRelay } from './native-file-drop-relay'
-import type { ClaudeLaunchProfile } from '../../shared/claude-launch-profile'
 
 export { ensureAutoUpdaterConfigured, registerUpdaterHandlers } from './main-window-updater'
 
@@ -55,7 +54,7 @@ export function attachMainWindowServices(
   getSelectedCodexHomePath?: GetSelectedCodexHomePath,
   prepareClaudeAuth?: (
     target?: ClaudeAccountSelectionTarget,
-    profile?: Pick<ClaudeLaunchProfile, 'accountId'>
+    account?: { accountId: string }
   ) => Promise<ClaudeRuntimeAuthPreparation>,
   options?: {
     agentProfiles?: TerminalProfileService

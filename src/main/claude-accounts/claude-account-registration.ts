@@ -130,9 +130,6 @@ export class ClaudeAccountRegistration {
       isolated ||
       this.dependencies.store
         .getSettings()
-        .claudeLaunchProfiles?.some((profile) => profile.accountId === accountId) ||
-      this.dependencies.store
-        .getSettings()
         .agentLaunchProfiles?.some(
           (profile) =>
             profile.agent === 'claude' &&

@@ -1,3 +1,4 @@
+import { supportsAgentProfileHost } from '../../shared/agent-profile-capabilities'
 import type { AgentSessionExecutionLocation } from '../../shared/agent-session-record'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import {
@@ -21,9 +22,20 @@ export function resolveStructuredAgentSessionCreateSupport(input: {
   location: AgentSessionExecutionLocation
   adapterSupportsCreate: boolean
   profileBound?: boolean
+  platform?: NodeJS.Platform
   getSettings: () => ClaudeManagedAccountGateSettings
 }): StructuredAgentSessionCreateSupport {
-  if (!input.adapterSupportsCreate) {
+  if (
+    !input.adapterSupportsCreate ||
+    (input.profileBound &&
+      !supportsAgentProfileHost({
+        platform: input.platform ?? process.platform,
+        hostId: input.location.executionHostId,
+        isWsl: Boolean(
+          input.location.wslDistro || process.env.WSL_DISTRO_NAME || process.env.WSL_INTEROP
+        )
+      }))
+  ) {
     return {
       supported: false,
       reason:

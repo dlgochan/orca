@@ -3,6 +3,7 @@
 // Launch coalescing when a launch adopts a conversation. Drives the real intent builder, because
 // the identity under test is derived there — mocking it out would assert only the mock's shape.
 
+import type { AgentLaunchProfile } from '../../../shared/agent-launch-profile'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StructuredAgentSessionCreateParams } from '../../../shared/structured-agent-session-create'
 
@@ -34,7 +35,17 @@ vi.mock('@/runtime/local-structured-session-tabs-sync', () => ({
 
 vi.mock('@/store', () => ({
   useAppStore: {
-    getState: () => ({ unifiedTabsByWorktree: {} }),
+    getState: () => ({
+      unifiedTabsByWorktree: {},
+      repos: [{ id: 'repo', connectionId: null }],
+      worktreesByRepo: {
+        repo: ['claude', 'codex'].map((agent) => ({
+          id: `wt-profile-${agent}`,
+          repoId: 'repo',
+          hostId: 'local'
+        }))
+      }
+    }),
     subscribe: () => () => {}
   }
 }))
@@ -75,6 +86,49 @@ describe('a launch that adopts a conversation is its own identity', () => {
       return { ok: true, value: { submission: { dispatchState: 'accepted' } } }
     })
   })
+
+  it.each(['claude', 'codex'] as const)(
+    'keeps %s profile A/B pending independently through the actual intent builder',
+    async (agent) => {
+      vi.stubGlobal('navigator', { userAgent: 'Linux' })
+      const worktreeId = `wt-profile-${agent}`
+      const a: AgentLaunchProfile = {
+        id: 'a',
+        name: 'Original A',
+        agent,
+        hostId: 'local',
+        executable: `/bin/${agent}`,
+        binding: { kind: 'managed', accountId: 'a' }
+      }
+      const b: AgentLaunchProfile = {
+        ...a,
+        id: 'b',
+        name: 'Original B',
+        binding: { kind: 'managed', accountId: 'b' }
+      }
+      const first = startStructuredAgentLaunch(worktreeId, agent, { agentProfile: a })
+      expect(getStructuredAgentLaunchStatus(worktreeId, agent, a)).toBe('pending')
+      expect(getStructuredAgentLaunchStatus(worktreeId, agent, b)).toBe('idle')
+      const second = startStructuredAgentLaunch(worktreeId, agent, { agentProfile: b })
+      const joined = startStructuredAgentLaunch(worktreeId, agent, {
+        agentProfile: { ...a, name: 'Renamed' }
+      })
+      await flushLaunchDispatch()
+      expect(first.sessionId).not.toBe(second.sessionId)
+      expect(joined.sessionId).toBe(first.sessionId)
+      expect(createParams().map((params) => params.agentProfileId)).toEqual(['a', 'b'])
+      expect(mocks.call).toHaveBeenCalledWith(
+        { kind: 'local' },
+        'agentSession.createSupport',
+        expect.objectContaining({ agentProfileId: 'a' })
+      )
+      expect(getStructuredAgentLaunchStatus(worktreeId, agent)).toBe('idle')
+      a.name = 'Changed after click'
+      expect(localStorage.getItem('orca:structuredAgentLaunches:v1')).toContain('Original A')
+      expect(localStorage.getItem('orca:structuredAgentLaunches:v1')).not.toContain('Renamed')
+      vi.unstubAllGlobals()
+    }
+  )
 
   it('does not hand a resume the blank launch already pending for the same worktree', async () => {
     // A joining caller is handed the EXISTING intent and contributes only its prompt, so joining

@@ -196,7 +196,7 @@ function structuredAgentLaunchState(
     worktreeId,
     agent,
     options.resumeFrom,
-    options.claudeProfile
+    options.agentProfile
   )
   const existing = getStructuredLaunchState(identity)
   if (existing) {
@@ -229,12 +229,12 @@ function structuredAgentLaunchState(
   // Only pass the third argument when adopting: every ordinary launch keeps the two-argument call
   // it has always made, so this change adds no trailing `undefined` for call-site assertions to
   // absorb.
-  const intent = options.claudeProfile
+  const intent = options.agentProfile
     ? createStructuredAgentSessionLaunchIntent(
         worktreeId,
         agent,
         options.resumeFrom,
-        options.claudeProfile
+        options.agentProfile
       )
     : options.resumeFrom
       ? createStructuredAgentSessionLaunchIntent(worktreeId, agent, options.resumeFrom)

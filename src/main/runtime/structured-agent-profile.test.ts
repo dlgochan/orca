@@ -6,6 +6,8 @@ vi.mock('./structured-agent-session-runtime', () => ({
 import * as adoption from './structured-agent-session-create-adoption'
 import { CodexStructuredSessionAdapter } from '../codex/codex-structured-session-adapter'
 import { fakeCodex } from '../codex/codex-structured-session-adapter-fixture'
+import { OrcaRuntimeWithRestoreStructuredAgentSessionTabsOnce } from './orca-runtime-restore-structured-agent-session-tabs-once'
+import type { RuntimeMobileSessionTabsSnapshot } from './runtime-types'
 import { OrcaRuntimeWithGetStructuredAgentSessionCreateSupport } from './orca-runtime-get-structured-agent-session-create-support'
 vi.mock('electron', () => ({
   BrowserWindow: { fromId: vi.fn(() => null) },
@@ -427,6 +429,54 @@ it.each(['claude', 'codex'] as const)(
     } finally {
       installed.mockRestore()
       resolve.mockRestore()
+    }
+  }
+)
+
+it.each(['claude', 'codex'] as const)(
+  '%s unknown profile create refuses without consulting the default account',
+  async (agent) => {
+    const { runtime, prepareLegacy } = createIntentRuntime()
+    await expect(
+      runtime.resolveStructuredAgentSessionCreateIntent({
+        envelope: { sessionId: 'unknown_session', clientOperationId: 'operation' },
+        worktree: 'workspace',
+        agent,
+        agentProfileId: 'missing'
+      })
+    ).rejects.toThrow(/no longer exists/)
+    expect(prepareLegacy).not.toHaveBeenCalled()
+    expect(prepare).not.toHaveBeenCalled()
+  }
+)
+
+it.each(['claude', 'codex'] as const)(
+  '%s restored tab uses the captured name after unlink',
+  async (agent) => {
+    const { profile, record } = await capture(agent)
+    await service.unlink(profile.id)
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: tab projection reads only the durable record from this host fixture.
+    const host = {
+      deps: { store: { getRecord: () => record } }
+    } as unknown as StructuredAgentSessionHost
+    const installed = vi.spyOn(registry, 'getStructuredAgentSessionHost').mockReturnValue(host)
+    const save = vi.fn((_workspace: string, snapshot: RuntimeMobileSessionTabsSnapshot) => snapshot)
+    try {
+      const runtime = Object.assign(new OrcaRuntimeWithRestoreStructuredAgentSessionTabsOnce(), {
+        mobileSessionTabsByWorktree: new Map(),
+        storeMobileSessionSnapshot: save,
+        emitMobileSessionTabsSnapshot: vi.fn()
+      })
+      runtime.projectStructuredAgentSessionTab({
+        workspaceId: 'workspace',
+        sessionId: record.sessionId,
+        agent,
+        activate: false
+      })
+      expect(save.mock.calls[0][1].tabs[0].title).toBe(record.accountHome.agentProfile?.name)
+      expect(save.mock.calls[0][1].tabs[0].title).toBe('one')
+    } finally {
+      installed.mockRestore()
     }
   }
 )

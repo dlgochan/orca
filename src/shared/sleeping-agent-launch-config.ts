@@ -4,7 +4,6 @@ import type { SleepingAgentLaunchConfig } from './agent-session-resume'
 export function buildSleepingAgentLaunchConfig(args: {
   agentProfile?: SleepingAgentLaunchConfig['agentProfile']
   claudeAccountId?: string | null
-  claudeProfile?: SleepingAgentLaunchConfig['claudeProfile']
   agentCommand?: string | null
   agentArgs?: string | null
   agentEnv?: Record<string, string> | null
@@ -15,7 +14,6 @@ export function buildSleepingAgentLaunchConfig(args: {
       ? { agentProfile: copyAgentProfileSnapshot(args.agentProfile) }
       : {}),
     ...(args.claudeAccountId !== undefined ? { claudeAccountId: args.claudeAccountId } : {}),
-    ...(args.claudeProfile ? { claudeProfile: { ...args.claudeProfile } } : {}),
     ...(args.agentCommand?.trim() ? { agentCommand: args.agentCommand } : {}),
     agentArgs: args.agentArgs ?? '',
     // Why: startup env may include prompt transport or pane identity values;

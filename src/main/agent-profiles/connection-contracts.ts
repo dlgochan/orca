@@ -2,25 +2,16 @@ import type {
   AgentLaunchProfile,
   AgentProfileSnapshot,
   ProfileAgent,
-  ProfileBinding,
   ProfileIdentity
 } from '../../shared/agent-launch-profile'
 import type { ProfileAliasSource } from '../agent-profile-discovery/literal-alias'
 import type { ProfileHostContext } from './host-discovery'
 import type { ProfileProviderAdapter } from './provider-adapters'
 
-export type AgentProfileConnectionInput = {
-  agent: ProfileAgent
-  source: { kind: 'home' | 'command'; value: string } | { kind: 'managed'; accountId: string }
-}
-export type AgentProfileCandidate = {
-  agent: ProfileAgent
-  hostId: ProfileHostContext['hostId']
-  executable: string
-  binding: ProfileBinding
-  resolvedHome: string
-  identity: ProfileIdentity
-}
+export type {
+  AgentProfileConnectionInput,
+  AgentProfileCandidate
+} from '../../shared/agent-profile-connection'
 export type PreparedAgentProfile = {
   /** Previous host observation is accepted only as an argv label, never executed. */
   priorExecutable?: string

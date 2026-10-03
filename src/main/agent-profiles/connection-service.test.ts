@@ -198,6 +198,9 @@ describe('host profile connections', () => {
     await writeFile(changed, 'fake')
     await chmod(changed, 0o700)
     executable = changed
+    await expect(
+      svc.save({ name: 'Duplicate after update', connection: connection() })
+    ).rejects.toThrow(/already connected/i)
     await svc.resolveSnapshotById(profile.id, { resume: false, mode: 'structured' })
     expect(prepareManaged).not.toHaveBeenCalled()
     const acquired = await svc.prepare(beforeUpdate, { resume: true, mode: 'structured' })

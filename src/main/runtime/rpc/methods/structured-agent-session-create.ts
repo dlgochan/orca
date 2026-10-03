@@ -13,7 +13,6 @@
  */
 
 import { refuse } from '../../../../shared/agent-session-wire-refusals'
-import type { ClaudeLaunchProfile } from '../../../../shared/claude-launch-profile'
 import { computeAgentSessionPayloadFingerprint } from '../../../../shared/agent-session-mutation-envelope'
 import type {
   AgentSessionAttachResult,
@@ -49,7 +48,6 @@ export type PreparedStructuredAgentSessionCreate = {
  */
 export function structuredAgentSessionCreateIntentFingerprint(params: {
   agentProfileId?: string
-  claudeProfile?: ClaudeLaunchProfile
   envelope: AgentSessionMutationEnvelope
   worktree: string
   agent: string
@@ -62,7 +60,6 @@ export function structuredAgentSessionCreateIntentFingerprint(params: {
     fields: {
       worktree: params.worktree,
       agentProfileId: params.agentProfileId,
-      claudeProfile: params.claudeProfile,
       agent: params.agent,
       resumeFrom: params.resumeFrom,
       tabId: params.tabId
@@ -74,7 +71,6 @@ export function structuredAgentSessionCreateIntentFingerprint(params: {
  *  `resolveUncommittedStructuredCreate` so a failure reaches the client as a refusal. */
 export async function prepareStructuredAgentSessionCreateForWorktree(args: {
   agentProfileId?: string
-  claudeProfile?: ClaudeLaunchProfile
   runtime: OrcaRuntimeService
   /** Installs the host lazily; called at the same point the RPC handler always installed it. */
   ensureHost: () => Promise<StructuredAgentSessionHost>
@@ -98,7 +94,6 @@ export async function prepareStructuredAgentSessionCreateForWorktree(args: {
     worktree: args.worktree,
     agent: args.agent,
     ...(args.agentProfileId !== undefined ? { agentProfileId: args.agentProfileId } : {}),
-    ...(args.claudeProfile ? { claudeProfile: args.claudeProfile } : {}),
     callerKey: args.caller.callerKey,
     ...(args.resumeFrom ? { resumeFrom: args.resumeFrom } : {})
   })

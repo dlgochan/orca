@@ -1,3 +1,9 @@
+import { supportsAgentProfileHost } from '../../shared/agent-profile-capabilities'
+import {
+  isAgentProfileConnectionInput,
+  isAgentProfileSaveInput,
+  type AgentProfileSaveInput
+} from '../../shared/agent-profile-connection'
 import { validateResolvedProfileSnapshot } from './snapshot-resolution'
 import { validatePreparedProfileLaunch, type ProfileLaunchContext } from './launch-authority'
 import { sanitizedProfilePreparationError } from './preparation-error'
@@ -42,7 +48,7 @@ export class AgentProfileConnectionService {
 
   private guard(): void {
     const host = this.dependencies.host
-    if (host.hostId !== 'local' || host.isWsl || !['darwin', 'linux'].includes(host.platform)) {
+    if (!supportsAgentProfileHost(host)) {
       throw new Error('Profiles are supported on local macOS/Linux hosts only.')
     }
   }
@@ -61,6 +67,9 @@ export class AgentProfileConnectionService {
   }
   async preview(input: AgentProfileConnectionInput): Promise<AgentProfileCandidate> {
     this.guard()
+    if (!isAgentProfileConnectionInput(input)) {
+      throw new Error('Invalid profile connection.')
+    }
     const adapter = this.dependencies.adapters[input.agent]
     if (!adapter || adapter.agent !== input.agent) {
       throw new Error('Unsupported profile agent.')
@@ -153,13 +162,12 @@ export class AgentProfileConnectionService {
     this.mutations = result.catch(() => undefined)
     return result
   }
-  save(input: {
-    id?: string
-    name: string
-    connection: AgentProfileConnectionInput
-  }): Promise<AgentLaunchProfile> {
+  save(input: AgentProfileSaveInput): Promise<AgentLaunchProfile> {
     return this.serialize(async () => {
       this.guard()
+      if (!isAgentProfileSaveInput(input)) {
+        throw new Error('Invalid profile data.')
+      }
       const profiles = await this.dependencies.store.read()
       if (input.id !== undefined && !profiles.some((profile) => profile.id === input.id)) {
         throw new Error('That profile no longer exists.')
@@ -178,7 +186,6 @@ export class AgentProfileConnectionService {
             profile.id !== input.id &&
             profile.agent === candidate.agent &&
             profile.hostId === candidate.hostId &&
-            profile.executable === candidate.executable &&
             JSON.stringify(profile.binding) === JSON.stringify(candidate.binding)
         )
       ) {
@@ -208,6 +215,9 @@ export class AgentProfileConnectionService {
   unlink(id: string): Promise<void> {
     return this.serialize(async () => {
       this.guard()
+      if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(id)) {
+        throw new Error('Invalid profile reference.')
+      }
       await this.dependencies.store.write(
         (await this.dependencies.store.read()).filter((profile) => profile.id !== id)
       )

@@ -1,11 +1,9 @@
 // Validates the immutable account home carried by a durable structured conversation.
 import { isAgentProfileSnapshot, type AgentProfileSnapshot } from './agent-launch-profile'
-import { isClaudeLaunchProfile, type ClaudeLaunchProfile } from './claude-launch-profile'
 /** Account root pinned at launch by the account selector, so a resume cannot drift to another login. */
 export type AgentSessionAccountHome = {
   agentProfile?: AgentProfileSnapshot
   claudeAccountId?: string
-  claudeProfile?: ClaudeLaunchProfile
   variable: 'CLAUDE_CONFIG_DIR' | 'CODEX_HOME'
   /** Host-resolved absolute path in the execution host's own path syntax. */
   path: string
@@ -28,15 +26,12 @@ export function isAgentSessionAccountHome(value: unknown): value is AgentSession
     (home.claudeAccountId === undefined ||
       (home.variable === 'CLAUDE_CONFIG_DIR' &&
         isBoundedString(home.claudeAccountId, MAX_ID_LENGTH))) &&
-    (home.claudeProfile === undefined ||
-      (home.variable === 'CLAUDE_CONFIG_DIR' && isClaudeLaunchProfile(home.claudeProfile))) &&
     (home.agentProfile === undefined ||
       (isAgentProfileSnapshot(home.agentProfile) &&
         home.agentProfile.identity.kind === 'verified' &&
         home.agentProfile.resolvedHome === home.path &&
         home.variable ===
           (home.agentProfile.agent === 'claude' ? 'CLAUDE_CONFIG_DIR' : 'CODEX_HOME') &&
-        home.claudeProfile === undefined &&
         home.claudeAccountId === undefined)) &&
     isBoundedString(home.path, MAX_PATH_LENGTH)
   )

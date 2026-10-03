@@ -84,6 +84,7 @@ export function attachMainWindowCoreServices(
           runtimeHome: codexRuntimeHome,
           systemCodexHomePath: resolveHostCodexSessionSourceHome(store.getSettings())
         }),
+      agentProfiles: state.agentProfiles ?? undefined,
       onBeforeRelaunch: async () => {
         state.isQuitting = true
         state.desktopRelayService?.fenceAndCloseNow()

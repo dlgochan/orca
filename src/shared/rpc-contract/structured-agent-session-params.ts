@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { isClaudeLaunchProfile, type ClaudeLaunchProfile } from '../claude-launch-profile'
 import { isAgentSessionSurfaceTabId } from '../agent-session-surface-tab-id'
 import { isAgentSessionId } from '../agent-session-record'
 import { normalizeExecutionHostId } from '../execution-host'
@@ -122,7 +121,6 @@ export const ResumeSource = z
 export const CreateIntentParams = z
   .object({
     agentProfileId: Identifier('Invalid agent profile id').optional(),
-    claudeProfile: z.custom<ClaudeLaunchProfile>(isClaudeLaunchProfile).optional(),
     envelope: MutationEnvelope,
     worktree: Identifier('Invalid worktree selector'),
     agent: z.enum(['claude', 'codex']),
@@ -143,6 +141,10 @@ export const CreateParams = z.union([AttachParams, CreateIntentParams])
 
 export const CreateSupportParams = z
   .object({
+    agentProfileId: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{1,128}$/)
+      .optional(),
     worktree: Identifier('Invalid worktree selector'),
     agent: z.enum(['claude', 'codex'])
   })

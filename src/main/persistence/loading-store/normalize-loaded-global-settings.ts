@@ -1,6 +1,5 @@
 import { getDefaultVoiceSettings } from '../../../shared/constants'
 import { normalizeAgentLaunchProfiles } from '../../../shared/agent-launch-profile'
-import { normalizeClaudeLaunchProfiles } from '../../../shared/claude-launch-profile'
 import { normalizePRBotAuthorOverrides } from '../../../shared/pr-bot-author-overrides'
 import { normalizeTerminalQuickCommands } from '../../../shared/terminal-quick-commands'
 import { normalizeOpenInApplications } from '../../../shared/open-in-applications'
@@ -63,7 +62,6 @@ export function normalizeLoadedGlobalSettings(
     // the default changed.
     ...stripRetiredGlobalSettings(parsed.settings),
     agentLaunchProfiles: normalizeAgentLaunchProfiles(parsed.settings?.agentLaunchProfiles),
-    claudeLaunchProfiles: normalizeClaudeLaunchProfiles(parsed.settings?.claudeLaunchProfiles),
     worktreeVisibilityDefaults: migratedExternalVisibility.defaults,
     prBotAuthorOverrides: normalizePRBotAuthorOverrides(parsed.settings?.prBotAuthorOverrides),
     // Why: v1.3.42 renamed the sidekick setting to pet; carry the old flag forward once so enabled users don't lose it.

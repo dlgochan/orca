@@ -1,7 +1,6 @@
 // Hold credential ownership until the caller commits a child or abandons its spawn.
 import type { SleepingAgentLaunchConfig } from '../../../../shared/agent-session-resume'
 import type { ClaudeAccountSelectionTarget } from '../../../claude-accounts/runtime-selection'
-import { assertClaudeProfileLaunchSupported } from '../../../claude-accounts/claude-profile-launch-guard'
 import { assertClaudeProfileEnvironment } from '../../../claude-accounts/claude-profile-environment'
 import { pinClaudeProfileTerminalCommand } from '../../../claude-accounts/claude-profile-cli'
 import { reserveClaudeCredentialOwner } from '../../../claude-accounts/live-pty-gate'
@@ -21,14 +20,7 @@ export async function prepareClaudeTerminalAuth(input: {
   if (input.reattach) {
     return { auth: null, command: input.command, release: undefined }
   }
-  const profile = input.launchConfig?.claudeProfile
-  const accountId = profile?.accountId ?? input.launchConfig?.claudeAccountId
-  assertClaudeProfileLaunchSupported({
-    profile,
-    isClaudeLaunch: input.isClaudeLaunch,
-    hasAuthPreparer: Boolean(input.prepare),
-    env: input.env
-  })
+  const accountId = input.launchConfig?.claudeAccountId
   if (accountId && (!input.isClaudeLaunch || !input.prepare)) {
     throw new Error('The saved Claude account requires a local Claude launch.')
   }
@@ -38,7 +30,6 @@ export async function prepareClaudeTerminalAuth(input: {
   if (
     input.migrationAt &&
     input.resumesConversation &&
-    !profile &&
     input.launchConfig?.claudeAccountId === undefined
   ) {
     throw new Error(

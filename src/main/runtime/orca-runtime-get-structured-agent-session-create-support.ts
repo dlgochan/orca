@@ -5,7 +5,6 @@ import {
   type StructuredAgentSessionCreateIntentInput
 } from './structured-agent-profile'
 import { agentSessionRefusalError } from '../../shared/agent-session-wire-refusals'
-import { assertClaudeProfileEnvironment } from '../claude-accounts/claude-profile-environment'
 import { OrcaRuntimeWithGetWorktreePs } from './orca-runtime-get-worktree-ps'
 import { supportsCodexStructuredLocation } from '../codex/codex-structured-location-support'
 import { supportsClaudeStructuredLocation } from '../claude/claude-structured-location-support'
@@ -101,31 +100,14 @@ export class OrcaRuntimeWithGetStructuredAgentSessionCreateSupport extends OrcaR
   async resolveStructuredAgentSessionCreateIntent(
     input: StructuredAgentSessionCreateIntentInput
   ): Promise<AgentSessionAttachParams> {
-    if (input.agentProfileId !== undefined && input.claudeProfile) {
-      throw new Error('Choose one profile binding.')
-    }
     if (input.agent === 'claude') {
       return this.resolveStructuredAgentSessionIntent(input, async ({ launchEnv, location }) => {
-        if (input.claudeProfile) {
-          if (
-            !this.prepareClaudeAuth ||
-            location.executionHostId !== LOCAL_EXECUTION_HOST_ID ||
-            location.wslDistro
-          ) {
-            throw new Error('Claude profiles require the local host runtime.')
-          }
-          assertClaudeProfileEnvironment(launchEnv)
-          return (await this.prepareClaudeAuth({ runtime: 'host' }, input.claudeProfile)).configDir
-        }
         return resolveStructuredClaudeAccountHomePath({
           launchEnv,
           wslDistro: location.wslDistro,
           getClaudeConfigDirectory: (target) => this.accounts.getClaudeConfigDirectory(target)
         })
       })
-    }
-    if (input.claudeProfile) {
-      throw new Error('Claude profiles can only launch Claude.')
     }
     return this.resolveStructuredAgentSessionIntent(input, async ({ launchEnv }) => {
       await applyStructuredCodexWorkspaceTrust({
@@ -188,7 +170,7 @@ export class OrcaRuntimeWithGetStructuredAgentSessionCreateSupport extends OrcaR
     const support = await this.getStructuredAgentSessionCreateSupport(
       input.worktree,
       input.agent,
-      input.agentProfileId !== undefined || Boolean(input.claudeProfile)
+      input.agentProfileId !== undefined
     )
     if (!support.supported) {
       throw agentSessionRefusalError('structured_agent_session_unsupported', {
@@ -234,11 +216,7 @@ export class OrcaRuntimeWithGetStructuredAgentSessionCreateSupport extends OrcaR
           selectedAccountHomePath
         })
       : null
-    if (
-      (input.claudeProfile || agentProfile) &&
-      adoption &&
-      adoption.accountHomePath !== selectedAccountHomePath
-    ) {
+    if (agentProfile && adoption && adoption.accountHomePath !== selectedAccountHomePath) {
       throw new Error(
         'This conversation belongs to another account. Resume it with its original profile.'
       )
@@ -256,7 +234,6 @@ export class OrcaRuntimeWithGetStructuredAgentSessionCreateSupport extends OrcaR
       accountHome: structuredAgentProfileAccountHome({
         agent: input.agent,
         agentProfile,
-        claudeProfile: input.claudeProfile,
         managedAccounts: settings.claudeManagedAccounts,
         selectedPath: selectedAccountHomePath,
         path: adoption?.accountHomePath ?? selectedAccountHomePath

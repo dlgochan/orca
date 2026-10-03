@@ -1,11 +1,11 @@
 import { settleStructuredAgentLaunchPrompt } from '@/lib/structured-agent-session-launch-prompt'
-import type { ClaudeLaunchProfile } from '../../../shared/claude-launch-profile'
+import type { AgentLaunchProfile } from '../../../shared/agent-launch-profile'
 import type { StructuredPromptDeliveryResult } from '@/lib/structured-agent-session-launch-prompt'
 import type { StructuredAgentSessionOutboxEntry } from '../../../shared/structured-agent-session-outbox'
 import type { StructuredAgentSessionResumeSource } from '../../../shared/structured-agent-session-create'
 
 export type StructuredAgentLaunchOptions = {
-  claudeProfile?: ClaudeLaunchProfile
+  agentProfile?: AgentLaunchProfile
   prompt?: string
   promptDelivery?: 'auto-submit' | 'submit-after-ready' | 'draft'
   onPromptDelivered?: () => void

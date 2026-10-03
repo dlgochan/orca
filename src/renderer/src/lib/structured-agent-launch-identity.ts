@@ -1,21 +1,22 @@
 import type { AgentSessionHandleProvider } from '../../../shared/agent-session-provider-handle'
 import type { StructuredAgentSessionResumeSource } from '../../../shared/structured-agent-session-create'
-import type { ClaudeLaunchProfile } from '../../../shared/claude-launch-profile'
+import type { AgentLaunchProfile } from '../../../shared/agent-launch-profile'
 
 // An account rebind is a different launch; a rename alone can safely join the pending launch.
 export function structuredLaunchIdentity(
   worktreeId: string,
   agent: AgentSessionHandleProvider,
   resumeFrom?: StructuredAgentSessionResumeSource,
-  claudeProfile?: ClaudeLaunchProfile
+  agentProfile?: AgentLaunchProfile
 ): string {
-  if (claudeProfile) {
+  if (agentProfile) {
     return JSON.stringify([
       agent,
       worktreeId,
       resumeFrom?.providerSessionId ?? null,
-      claudeProfile.id,
-      claudeProfile.accountId
+      agentProfile.id,
+      agentProfile.hostId,
+      agentProfile.binding
     ])
   }
   return resumeFrom

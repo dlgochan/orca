@@ -1,6 +1,5 @@
 import type { ClaudeStructuredLaunchResolverDeps } from '../claude/claude-structured-launch-resolution'
 import type { AgentSessionAccountHome } from '../../shared/agent-session-account-home'
-import type { ClaudeLaunchProfile } from '../../shared/claude-launch-profile'
 import { hasIsolatedClaudeAccountAuth } from '../claude-accounts/isolated-account-auth'
 // Captures host-owned profile identity without acquiring credentials at create-intent time.
 import type { AgentSessionExecutionLocation } from '../../shared/agent-session-record'
@@ -66,7 +65,6 @@ export async function structuredClaudeProfileInvocationDeps(
 export function structuredAgentProfileAccountHome(input: {
   agent: ProfileAgent
   agentProfile?: AgentProfileSnapshot
-  claudeProfile?: ClaudeLaunchProfile
   managedAccounts?: readonly { id: string; managedAuthPath: string }[]
   selectedPath: string
   path: string
@@ -83,14 +81,12 @@ export function structuredAgentProfileAccountHome(input: {
     variable: input.agent === 'claude' ? 'CLAUDE_CONFIG_DIR' : 'CODEX_HOME',
     path: input.path,
     ...(input.agentProfile ? { agentProfile: input.agentProfile } : {}),
-    ...(account ? { claudeAccountId: account.id } : {}),
-    ...(input.claudeProfile ? { claudeProfile: { ...input.claudeProfile } } : {})
+    ...(account ? { claudeAccountId: account.id } : {})
   }
 }
 
 export type StructuredAgentSessionCreateIntentInput = {
   agentProfileId?: string
-  claudeProfile?: ClaudeLaunchProfile
   envelope: { sessionId: string; clientOperationId: string }
   worktree: string
   agent: ProfileAgent

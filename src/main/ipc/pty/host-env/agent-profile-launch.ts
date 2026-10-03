@@ -51,7 +51,6 @@ export async function prepareTerminalProfileLaunch(
   const snapshot =
     config?.agentProfile === undefined ? undefined : copyAgentProfileSnapshot(config.agentProfile)
   if (
-    config?.claudeProfile !== undefined ||
     config?.claudeAccountId !== undefined ||
     (args.agentProfileId !== undefined &&
       (!/^[A-Za-z0-9_-]{1,128}$/.test(args.agentProfileId) || snapshot !== undefined)) ||

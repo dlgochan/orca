@@ -1,5 +1,9 @@
+import {
+  assertAgentProfileWorkspace,
+  assertStructuredAgentProfileWorkspace
+} from './agent-profile-workspace-selection'
 import type { AgentSessionHandleProvider } from '../../../shared/agent-session-provider-handle'
-import type { ClaudeLaunchProfile } from '../../../shared/claude-launch-profile'
+import type { AgentLaunchProfile } from '../../../shared/agent-launch-profile'
 import type {
   AgentSessionAttachResult,
   AgentSessionMutationResult
@@ -30,6 +34,7 @@ import { LOCAL_STRUCTURED_SESSION_OWNER } from '@/runtime/local-structured-sessi
 import { createBrowserUuid } from '@/lib/browser-uuid'
 
 export type StructuredAgentSessionLaunchIntent = {
+  agentProfile?: AgentLaunchProfile
   sessionId: string
   worktreeId: string
   agent: AgentSessionHandleProvider
@@ -113,7 +118,7 @@ export function createStructuredAgentSessionLaunchIntent(
   worktreeId: string,
   agent: AgentSessionHandleProvider,
   resumeFrom?: StructuredAgentSessionResumeSource,
-  claudeProfile?: ClaudeLaunchProfile
+  agentProfile?: AgentLaunchProfile
 ): StructuredAgentSessionLaunchIntent {
   const sessionId = createStructuredAgentSessionId(agent, createBrowserUuid)
   return buildStructuredAgentSessionLaunchIntent(
@@ -121,7 +126,7 @@ export function createStructuredAgentSessionLaunchIntent(
     agent,
     sessionId,
     resumeFrom,
-    claudeProfile
+    agentProfile
   )
 }
 
@@ -130,9 +135,10 @@ function buildStructuredAgentSessionLaunchIntent(
   agent: AgentSessionHandleProvider,
   sessionId: string,
   resumeFrom?: StructuredAgentSessionResumeSource,
-  claudeProfile?: ClaudeLaunchProfile
+  agentProfile?: AgentLaunchProfile
 ): StructuredAgentSessionLaunchIntent {
   const state = useAppStore.getState()
+  assertStructuredAgentProfileWorkspace(state, agent, worktreeId, agentProfile)
   recordWebSessionFocusIntent(
     { environmentId: LOCAL_STRUCTURED_SESSION_OWNER },
     worktreeId,
@@ -149,9 +155,12 @@ function buildStructuredAgentSessionLaunchIntent(
       worktree: toRuntimeWorktreeSelector(worktreeId),
       agent,
       ...(resumeFrom ? { resumeFrom } : {}),
-      ...(claudeProfile ? { claudeProfile } : {}),
+      ...(agentProfile ? { agentProfileId: agentProfile.id } : {}),
       randomUuid: createBrowserUuid
     }),
+    ...(agentProfile
+      ? { agentProfile: { ...agentProfile, binding: { ...agentProfile.binding } } }
+      : {}),
     ...launchSeedOptions(state, agent)
   }
 }
@@ -165,13 +174,13 @@ export function retryStructuredAgentSessionLaunchIntent(
     intent.agent,
     intent.sessionId,
     intent.params.resumeFrom,
-    intent.params.claudeProfile
+    intent.agentProfile
   )
 }
 
 /** Rebuild a reload-surviving intent with the caller's current worktree selector. */
 export function restoreStructuredAgentSessionLaunchIntent(args: {
-  claudeProfile?: ClaudeLaunchProfile
+  agentProfile?: AgentLaunchProfile
   worktreeId: string
   sessionId: string
   agent: AgentSessionHandleProvider
@@ -181,6 +190,7 @@ export function restoreStructuredAgentSessionLaunchIntent(args: {
   resumeFrom?: StructuredAgentSessionResumeSource
 }): StructuredAgentSessionLaunchIntent {
   const state = useAppStore.getState()
+  assertStructuredAgentProfileWorkspace(state, args.agent, args.worktreeId, args.agentProfile)
   recordWebSessionFocusIntent(
     { environmentId: LOCAL_STRUCTURED_SESSION_OWNER },
     args.worktreeId,
@@ -202,8 +212,9 @@ export function restoreStructuredAgentSessionLaunchIntent(args: {
       worktree: toRuntimeWorktreeSelector(args.worktreeId),
       agent: args.agent,
       ...(args.resumeFrom ? { resumeFrom: args.resumeFrom } : {}),
-      ...(args.claudeProfile ? { claudeProfile: args.claudeProfile } : {})
+      ...(args.agentProfile ? { agentProfileId: args.agentProfile.id } : {})
     },
+    ...(args.agentProfile ? { agentProfile: args.agentProfile } : {}),
     ...launchSeedOptions(state, args.agent)
   }
 }
@@ -253,7 +264,13 @@ async function hostSupportsCreate(intent: StructuredAgentSessionLaunchIntent): P
       const support = await callStructuredAgentSession<{ supported: boolean; reason?: string }>(
         { kind: 'local' },
         'agentSession.createSupport',
-        { worktree: intent.params.worktree, agent: intent.agent }
+        {
+          worktree: intent.params.worktree,
+          agent: intent.agent,
+          ...(intent.params.agentProfileId !== undefined
+            ? { agentProfileId: intent.params.agentProfileId }
+            : {})
+        }
       )
       return support.supported === true
     } catch (error) {
@@ -298,6 +315,9 @@ async function requireHostCreateSupport(intent: StructuredAgentSessionLaunchInte
 export async function launchStructuredAgentSession(
   intent: StructuredAgentSessionLaunchIntent
 ): Promise<Pick<AgentSessionAttachResult, 'sessionId' | 'fence'>> {
+  if (intent.params.agentProfileId !== undefined) {
+    assertAgentProfileWorkspace(useAppStore.getState(), intent.agent, intent.worktreeId)
+  }
   await requireHostCreateSupport(intent)
   let result: AgentSessionMutationResult<AgentSessionAttachResult>
   try {

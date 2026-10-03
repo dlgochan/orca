@@ -16,7 +16,6 @@ import { buildAgentResumeLaunchCommand } from './agent-resume-launch-command'
 export function buildAgentResumeStartupPlan(args: {
   agentProfile?: SleepingAgentLaunchConfig['agentProfile']
   claudeAccountId?: string | null
-  claudeProfile?: SleepingAgentLaunchConfig['claudeProfile']
   agent: ResumableTuiAgent
   providerSession: AgentProviderSessionMetadata
   cmdOverrides: Partial<Record<TuiAgent, string>>

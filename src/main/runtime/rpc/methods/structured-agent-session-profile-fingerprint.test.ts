@@ -7,7 +7,7 @@ it('verifies profile-bound create fingerprints on the host', () => {
     sessionId: 'claude_session1',
     worktree: 'folder:workspace',
     agent: 'claude',
-    claudeProfile: { id: 'work', name: 'Work Claude', accountId: 'a' },
+    agentProfileId: 'work',
     now: 1_800_000_000_000,
     randomUuid: () => '00000000-0000-4000-8000-000000000001'
   })
@@ -17,7 +17,7 @@ it('verifies profile-bound create fingerprints on the host', () => {
   expect(request.envelope.payloadFingerprint).not.toBe(
     structuredAgentSessionCreateIntentFingerprint({
       ...request,
-      claudeProfile: { id: 'work', name: 'Work Claude', accountId: 'b' }
+      agentProfileId: 'personal'
     })
   )
 })

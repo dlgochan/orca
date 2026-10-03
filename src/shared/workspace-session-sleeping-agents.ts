@@ -1,6 +1,5 @@
 import { isAgentProfileSnapshot, type AgentProfileSnapshot } from './agent-launch-profile'
 import { z } from 'zod'
-import { isClaudeLaunchProfile, type ClaudeLaunchProfile } from './claude-launch-profile'
 import {
   getAgentResumeArgv,
   normalizeAgentProviderSession,
@@ -72,7 +71,6 @@ const sleepingAgentLaunchConfigBaseSchema = z.object({
     .regex(/^[A-Za-z0-9_-]{1,128}$/)
     .nullable()
     .optional(),
-  claudeProfile: z.custom<ClaudeLaunchProfile>(isClaudeLaunchProfile).optional(),
   agentCommand: z.string().optional(),
   agentArgs: z.string(),
   agentEnv: sleepingAgentLaunchEnvSchema,
@@ -89,13 +87,7 @@ const sleepingAgentLaunchConfigBaseSchema = z.object({
 
 export const sleepingAgentLaunchConfigSchema = z.preprocess((raw) => {
   // A damaged explicit account binding must never become a default-account resume.
-  if (
-    raw &&
-    typeof raw === 'object' &&
-    ('agentProfile' in raw ||
-      ('claudeProfile' in raw && raw.claudeProfile !== undefined) ||
-      'claudeAccountId' in raw)
-  ) {
+  if (raw && typeof raw === 'object' && ('agentProfile' in raw || 'claudeAccountId' in raw)) {
     return raw
   }
   const parsed = sleepingAgentLaunchConfigBaseSchema.safeParse(raw)

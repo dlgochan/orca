@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import type { AgentSessionHandleProvider } from '../../../shared/agent-session-provider-handle'
-import type { ClaudeLaunchProfile } from '../../../shared/claude-launch-profile'
+import type { AgentLaunchProfile } from '../../../shared/agent-launch-profile'
 import type { AgentSessionWriteRefusal } from '../../../shared/agent-session-write-failure'
 import { structuredLaunchIdentity } from './structured-agent-launch-identity'
 export { structuredLaunchIdentity } from './structured-agent-launch-identity'
@@ -102,10 +102,10 @@ function persistStructuredLaunchState(state: StructuredLaunchState): void {
     deleteStructuredAgentLaunchRecord(state.intent.sessionId)
     return
   }
-  const { envelope, resumeFrom, claudeProfile } = state.intent.params
+  const { envelope, resumeFrom } = state.intent.params
   const record: StructuredAgentLaunchPersistedRecord = {
     sessionId: state.intent.sessionId,
-    ...(claudeProfile ? { claudeProfile } : {}),
+    ...(state.intent.agentProfile ? { agentProfile: state.intent.agentProfile } : {}),
     agent: state.intent.agent,
     lifecycle,
     clientOperationId: envelope.clientOperationId,
@@ -316,7 +316,7 @@ export function retireAbsentStructuredAgentSessionLaunchCancellationTombstones(
 export function getStructuredAgentLaunchStatus(
   worktreeId: string,
   agent: AgentSessionHandleProvider,
-  profile?: ClaudeLaunchProfile
+  profile?: AgentLaunchProfile
 ): StructuredAgentLaunchStatus {
   if (profile) {
     const state = getStructuredLaunchState(

@@ -25,7 +25,7 @@ export function restorePersistedStructuredLaunchState(
     clientOperationId: record.clientOperationId,
     payloadFingerprint: record.payloadFingerprint,
     expectedRuntimeFence: record.expectedRuntimeFence,
-    ...(record.claudeProfile ? { claudeProfile: record.claudeProfile } : {}),
+    ...(record.agentProfile ? { agentProfile: record.agentProfile } : {}),
     ...(record.resumeFrom ? { resumeFrom: record.resumeFrom } : {})
   })
   const callers: StructuredLaunchCallerGroup = createStructuredLaunchCallerGroup()
@@ -34,7 +34,7 @@ export function restorePersistedStructuredLaunchState(
       worktreeId,
       record.agent,
       record.resumeFrom,
-      record.claudeProfile
+      record.agentProfile
     ),
     intent,
     promptDelivery: 'draft',

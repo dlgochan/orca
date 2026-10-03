@@ -1,6 +1,5 @@
 import type { GlobalSettings } from '../../../shared/global-settings-types'
 import { normalizeAgentLaunchProfiles } from '../../../shared/agent-launch-profile'
-import { normalizeClaudeLaunchProfiles } from '../../../shared/claude-launch-profile'
 import { normalizeDisabledTuiAgents } from '../../../shared/tui-agent-selection'
 import { resolveNestedWorkerMaxDepth } from '../../../shared/nested-worker-depth'
 import {
@@ -61,11 +60,6 @@ export function updateSettings(
   const sanitizedUpdates = stripRetiredGlobalSettings(updates)
   if ('agentLaunchProfiles' in updates) {
     sanitizedUpdates.agentLaunchProfiles = normalizeAgentLaunchProfiles(updates.agentLaunchProfiles)
-  }
-  if ('claudeLaunchProfiles' in updates) {
-    sanitizedUpdates.claudeLaunchProfiles = normalizeClaudeLaunchProfiles(
-      updates.claudeLaunchProfiles
-    )
   }
   if ('opencodeSessionCookie' in updates && !updates.opencodeSessionCookie) {
     operations.removeRetainedBlob(PROTECTED_SECRET_SLOT.opencodeSessionCookie)

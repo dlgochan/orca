@@ -8,5 +8,5 @@ Owns Claude account registration, credential storage, and launch authentication.
 - `account-credential-mutation.ts`: serializes enrollment, reauthentication, and usage polling for each account.
 - `managed-auth-path.ts`, `keychain.ts`: owned files and platform credential storage.
 
-Profile names and account bindings are defined in `../../shared/claude-launch-profile.ts`.
+Profile names and account bindings are defined in `../../shared/agent-launch-profile.ts`.
 Usage polling in `../rate-limits/` shares the credential authority defined here.

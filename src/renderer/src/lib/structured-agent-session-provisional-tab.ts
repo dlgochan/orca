@@ -82,7 +82,7 @@ export function beginStructuredAgentSessionProvisionalLaunch(args: {
         worktreeId,
         sessionId: handle.sessionId,
         agent: args.plan.agent,
-        ...(args.plan.claudeProfile ? { profileName: args.plan.claudeProfile.name } : {}),
+        ...(args.plan.agentProfile ? { profileName: args.plan.agentProfile.name } : {}),
         ...(args.targetGroupId ? { targetGroupId: args.targetGroupId } : {}),
         ...(args.activate !== undefined ? { activate: args.activate } : {})
       })

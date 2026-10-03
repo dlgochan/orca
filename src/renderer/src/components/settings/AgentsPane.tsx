@@ -51,8 +51,9 @@ import {
 import { AgentAvailabilityControl, type AgentCatalogRowProps } from './AgentCatalogRow'
 import { AgentDefaultSetting } from './AgentDefaultSetting'
 import { AgentDetectionCatalog } from './AgentDetectionCatalog'
-import { ClaudeLaunchProfiles } from './ClaudeLaunchProfiles'
-import { isWindowsUserAgent } from '@/components/terminal-pane/pane-helpers'
+import { AgentLaunchProfiles } from './AgentLaunchProfiles'
+import { isProfileAgent } from '../../../../shared/agent-profile-capabilities'
+import { isLocalAgentProfileHost } from '@/lib/agent-profile-workspace-selection'
 
 export {
   buildAgentAvailabilitySettingsUpdate,
@@ -209,11 +210,12 @@ export function AgentsPane({
   ): AgentCatalogRowProps => ({
     agentId: agent.id,
     children:
-      agent.id === 'claude' &&
+      isProfileAgent(agent.id) &&
+      isTuiAgentEnabled(agent.id, disabledAgents) &&
       !activeServerEnvironmentId &&
       !isPairedWebClientWindow() &&
-      !isWindowsUserAgent() ? (
-        <ClaudeLaunchProfiles settings={settings} updateSettings={updateSettings} />
+      isLocalAgentProfileHost() ? (
+        <AgentLaunchProfiles agent={agent.id} settings={settings} />
       ) : undefined,
     label: agent.label,
     homepageUrl: agent.homepageUrl,

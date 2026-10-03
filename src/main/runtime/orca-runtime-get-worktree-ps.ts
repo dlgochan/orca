@@ -158,7 +158,7 @@ export class OrcaRuntimeWithGetWorktreePs extends OrcaRuntimeWithStartTuiIdleVis
       resolveShellEnvironmentPolicy: () =>
         nativeChatShellEnvironmentPolicy(this.requireStore().getSettings()),
       resolveClaudeAuthPolicy: async (home) => {
-        const accountId = home?.claudeProfile?.accountId ?? home?.claudeAccountId
+        const accountId = home?.claudeAccountId
         if (accountId) {
           if (!this.prepareClaudeAuth) {
             throw new Error('Claude profile authentication is unavailable.')

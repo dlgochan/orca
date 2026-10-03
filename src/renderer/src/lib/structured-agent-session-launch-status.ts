@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import type { AgentSessionHandleProvider } from '../../../shared/agent-session-provider-handle'
-import type { ClaudeLaunchProfile } from '../../../shared/claude-launch-profile'
+import type { AgentLaunchProfile } from '../../../shared/agent-launch-profile'
 import {
   getStructuredAgentLaunchStatus,
   subscribeStructuredAgentLaunchStatus
@@ -9,7 +9,7 @@ import {
 export function useStructuredAgentLaunchStatus(
   worktreeId: string,
   agent: AgentSessionHandleProvider,
-  profile?: ClaudeLaunchProfile
+  profile?: AgentLaunchProfile
 ): ReturnType<typeof getStructuredAgentLaunchStatus> {
   return useSyncExternalStore(
     subscribeStructuredAgentLaunchStatus,

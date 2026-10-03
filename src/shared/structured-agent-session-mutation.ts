@@ -1,5 +1,4 @@
 import { sha256 } from './sha256'
-import type { ClaudeLaunchProfile } from './claude-launch-profile'
 
 function canonicalize(value: unknown): string {
   if (value === null || typeof value !== 'object') {
@@ -41,7 +40,6 @@ export function structuredAgentSessionDomainFingerprint(input: {
 
 export function structuredAgentSessionCreateFingerprint(input: {
   agentProfileId?: string
-  claudeProfile?: ClaudeLaunchProfile
   sessionId: string
   worktree: string
   agent: 'claude' | 'codex'
@@ -54,7 +52,6 @@ export function structuredAgentSessionCreateFingerprint(input: {
     fields: {
       worktree: input.worktree,
       agentProfileId: input.agentProfileId,
-      claudeProfile: input.claudeProfile,
       agent: input.agent,
       // `canonicalize` drops undefined, so a plain create keeps the digest it has always had.
       // Adopting a conversation is a different intent and must not replay as a blank create.
