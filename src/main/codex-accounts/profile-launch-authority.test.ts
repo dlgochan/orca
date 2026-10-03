@@ -37,29 +37,77 @@ const valid = () => ({
   }
 })
 describe('managed Codex effective launch authority', () => {
-  it('asks the provider for cwd config, policy and account without login or refresh', async () => {
-    const p = probe(valid())
-    await observeCodexProfileLaunchAuthority(
-      { snapshot, cwd: '/workspace', env: { CODEX_HOME: '/accounts/a' } },
-      p.runSession
-    )
-    expect(p.invocations[0]).toMatchObject({
-      command: '/tools/provider',
-      cwd: '/workspace',
-      timeoutMs: 8000,
-      maxOutputBytes: 1024 * 1024,
-      env: { CODEX_HOME: '/accounts/a' }
+  it.each(['openai', null])(
+    'inspects cwd, policy and account without login or refresh (provider: %s)',
+    async (modelProvider) => {
+      const responses = valid()
+      const p = probe({
+        ...responses,
+        'config/read': {
+          ...responses['config/read'],
+          config: { ...config, model_provider: modelProvider }
+        }
+      })
+      await observeCodexProfileLaunchAuthority(
+        { snapshot, cwd: '/workspace', env: { CODEX_HOME: '/accounts/a' } },
+        p.runSession
+      )
+      expect(p.invocations[0]).toMatchObject({
+        command: '/tools/provider',
+        cwd: '/workspace',
+        timeoutMs: 8000,
+        maxOutputBytes: 1024 * 1024,
+        env: { CODEX_HOME: '/accounts/a' }
+      })
+      expect(p.requests.mock.calls).toEqual([
+        ['config/read', { cwd: '/workspace', includeLayers: true }],
+        ['configRequirements/read', {}],
+        ['account/read', { refreshToken: false }]
+      ])
+    }
+  )
+  it('accepts the provider built-in ChatGPT endpoint when no configuration source sets it', async () => {
+    const p = probe({
+      ...valid(),
+      'config/read': {
+        config: { ...config, chatgpt_base_url: 'https://chatgpt.com/backend-api/' },
+        origins: {},
+        layers: [{ name: { type: 'user' }, config: {} }]
+      }
     })
-    expect(p.requests.mock.calls).toEqual([
-      ['config/read', { cwd: '/workspace', includeLayers: true }],
-      ['configRequirements/read', {}],
-      ['account/read', { refreshToken: false }]
-    ])
+    await expect(
+      observeCodexProfileLaunchAuthority({ snapshot, cwd: '/workspace', env: {} }, p.runSession)
+    ).resolves.toBeUndefined()
   })
+  it.each([
+    { origins: { chatgpt_base_url: { name: { type: 'system' } } }, layers: [] },
+    {
+      origins: {},
+      layers: [
+        { name: { type: 'user' }, config: { chatgpt_base_url: 'https://chatgpt.com/backend-api/' } }
+      ]
+    }
+  ])(
+    'refuses explicit endpoint ownership even when it matches the built-in URL: %j',
+    async (sources) => {
+      const p = probe({
+        ...valid(),
+        'config/read': {
+          config: { ...config, chatgpt_base_url: 'https://chatgpt.com/backend-api/' },
+          ...sources
+        }
+      })
+      await expect(
+        observeCodexProfileLaunchAuthority({ snapshot, cwd: '/workspace', env: {} }, p.runSession)
+      ).rejects.toMatchObject({ code: 'codex_config' })
+      expect(p.requests).not.toHaveBeenCalledWith('account/read', expect.anything())
+    }
+  )
   it.each([
     { model_provider: 'custom' },
     { model_providers: { openai: { base_url: 'SECRET_SENTINEL' } } },
     { openai_base_url: 'SECRET_SENTINEL' },
+    { chatgpt_base_url: 'https://example.invalid/backend-api/' },
     { cli_auth_credentials_store: 'keyring' }
   ])('refuses effective workspace/provider routing %j', async (override) => {
     const p = probe({

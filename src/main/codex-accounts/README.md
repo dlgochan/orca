@@ -25,3 +25,5 @@ session lifecycle, then compare the observed account and owned-home identity. Th
 no turn/login/explicit refresh request; provider startup can still consult policy or update its owned
 home. Unsupported authority is refused. Configuration and credential changes after observation
 remain a time-of-check limitation. External profiles keep their user-owned provider configuration.
+
+`profile-launch-authority.real-cli.test.ts` checks the app-server inspection protocol and logged-out refusal with a pinned container-local CLI. Opt in with `ORCA_PROFILE_PROTOCOL_SMOKE=1` and `ORCA_PROFILE_PROTOCOL_CLI`; the test requires a disposable Linux container and creates an empty home.

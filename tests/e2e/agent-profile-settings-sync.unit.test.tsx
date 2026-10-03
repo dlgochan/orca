@@ -312,6 +312,38 @@ describe.each(['claude', 'codex'] as const)('%s settings synchronization', (agen
     )
     expectSelectionPreserved()
   })
+  it.each([
+    { platform: 'win32', osRelease: 'test', hostId: 'local' },
+    { platform: 'linux', osRelease: 'microsoft-standard-WSL2', hostId: 'local' },
+    { platform: 'linux', osRelease: 'test', hostId: 'ssh:remote' },
+    { platform: 'linux', osRelease: 'test', hostId: 'runtime:remote' }
+  ] as const)('withholds profile actions on unsupported hosts: %j', async (host) => {
+    const profile = await service.save({
+      name: 'Work',
+      connection: { agent, source: { kind: 'home', value: state.root } }
+    })
+    vi.spyOn(window.api.platform, 'get').mockReturnValue({
+      ...window.api.platform.get(),
+      platform: host.platform,
+      osRelease: host.osRelease
+    })
+    useAppStore.setState((current) => ({
+      folderWorkspaces: current.folderWorkspaces.map((folder) => ({
+        ...folder,
+        executionHostId: host.hostId
+      }))
+    }))
+    render(<Surface agent={agent} />)
+    expect(menu().queryByRole('button', { name: /Work/ })).toBeNull()
+    expect(() =>
+      resolveAgentProfileForWorkspace(useAppStore.getState(), {
+        agent,
+        worktreeId: 'folder:local',
+        agentProfileId: profile.id
+      })
+    ).toThrow(/local macOS\/Linux/)
+    expect(state.launch).not.toHaveBeenCalled()
+  })
   it.each([false, true])(
     'retains successful enrollment across cancellation (login finishes first: %s)',
     async (loginFirst) => {

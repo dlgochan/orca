@@ -112,7 +112,14 @@ export async function observeCodexProfileLaunchAuthority(
         ) {
           throw new AgentProfilePreparationError('codex_policy')
         }
-        assertCodexProfileRoutingConfiguration(read.config)
+        // The provider materializes its built-in URL without an origin. Explicit sources
+        // still pass through the stricter layer/policy checks below, even for this exact URL.
+        const effectiveConfig =
+          read.config.chatgpt_base_url === 'https://chatgpt.com/backend-api/' &&
+          !Object.hasOwn(read.origins, 'chatgpt_base_url')
+            ? { ...read.config, chatgpt_base_url: undefined }
+            : read.config
+        assertCodexProfileRoutingConfiguration(effectiveConfig)
         if (read.config.cli_auth_credentials_store !== 'file') {
           throw new AgentProfilePreparationError('codex_policy')
         }
