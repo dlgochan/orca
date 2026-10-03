@@ -25,7 +25,7 @@ export function createAgentProfileConnectionService(
     store: {
       read: () => services.store.getSettings().agentLaunchProfiles ?? [],
       write: async (profiles) => {
-        services.store.updateSettings({ agentLaunchProfiles: profiles })
+        services.store.updateSettings({ agentLaunchProfiles: profiles }, { notifyListeners: true })
       }
     }
   })

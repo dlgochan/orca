@@ -5,8 +5,13 @@ import { getDefaultSettings } from '../../../../shared/constants'
 import type { AgentLaunchProfile, ProfileAgent } from '../../../../shared/agent-launch-profile'
 import type { AgentProfileCandidate } from '../../../../shared/agent-profile-connection'
 import { AgentLaunchProfiles } from './AgentLaunchProfiles'
-const openSettingsTarget = vi.hoisted(() => vi.fn())
-vi.mock('@/store', () => ({ useAppStore: { getState: () => ({ openSettingsTarget }) } }))
+const { openSettingsTarget, fetchSettings } = vi.hoisted(() => ({
+  openSettingsTarget: vi.fn(),
+  fetchSettings: vi.fn(async () => {})
+}))
+vi.mock('@/store', () => ({
+  useAppStore: { getState: () => ({ openSettingsTarget, fetchSettings }) }
+}))
 vi.mock('sonner', () => ({ toast: { message: vi.fn(), error: vi.fn() } }))
 const preview = vi.fn()
 const save = vi.fn()
@@ -113,6 +118,7 @@ describe.each(['claude', 'codex'] as const)('%s shared profile form', (agent) =>
       name: 'Work',
       connection: { agent, source: { kind: 'managed', accountId: 'a' } }
     })
+    expect(fetchSettings).toHaveBeenCalledOnce()
     expect(select).not.toHaveBeenCalled()
     expect(remove).not.toHaveBeenCalled()
   })
@@ -178,6 +184,7 @@ describe.each(['claude', 'codex'] as const)('%s shared profile form', (agent) =>
     fireEvent.click(screen.getByRole('button', { name: 'Sign in to another account' }))
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     await act(async () => resolve({ accounts: [{ id: 'late', email: 'late@example.test' }] }))
+    expect(fetchSettings).toHaveBeenCalledOnce()
     expect(cancel).toHaveBeenCalledOnce()
     expect(save).not.toHaveBeenCalled()
     expect(remove).not.toHaveBeenCalled()
@@ -189,6 +196,7 @@ describe.each(['claude', 'codex'] as const)('%s shared profile form', (agent) =>
     setup(agent)
     fireEvent.click(screen.getByRole('button', { name: 'Sign in to another account' }))
     await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('Sign-in cancelled'))
+    expect(fetchSettings).not.toHaveBeenCalled()
     expect(save).not.toHaveBeenCalled()
   })
   it('renames and unlinks via the host while preserving accounts', async () => {
