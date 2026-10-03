@@ -8,7 +8,10 @@ import type { AdoptStablePaneResult } from '../ipc/spawn-types'
 import type { PtyBindingSourceExpectation } from '../../../persistence'
 import type { PtyRuntimeControllerDeps } from './controller-deps'
 import type { TuiAgent } from '../../../../shared/tui-agent'
-import type { AgentProviderSessionMetadata } from '../../../../shared/agent-session-resume'
+import type {
+  AgentProviderSessionMetadata,
+  SleepingAgentLaunchConfig
+} from '../../../../shared/agent-session-resume'
 import type { StartupCommandDelivery } from '../../../../shared/codex-startup-delivery'
 import type {
   AgentSessionExecutionClaim,
@@ -17,6 +20,7 @@ import type {
 import { localProvider } from '../provider/registry'
 
 export type RuntimePtySpawnState = {
+  releaseClaudeCredentialOwner?: () => void
   deps: PtyRuntimeControllerDeps
   args: RuntimePtySpawnArgs
   codexHomeLaunchStartedAt: Date | undefined
@@ -82,6 +86,7 @@ export type RuntimePtySpawnState = {
 }
 
 export type RuntimePtySpawnArgs = {
+  launchConfig?: SleepingAgentLaunchConfig
   cols: number
   rows: number
   cwd?: string

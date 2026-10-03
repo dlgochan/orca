@@ -1,5 +1,5 @@
 import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk'
-import type { AgentSessionRecord } from '../../shared/agent-session-record'
+import type { AgentSessionRecord, AgentSessionAccountHome } from '../../shared/agent-session-record'
 import { resolveClaudeCommand } from '../codex-cli/command'
 import type { ClaudeStructuredAuthPolicy } from '../claude-accounts/claude-structured-auth-policy'
 import { createClaudeStructuredLaunchResolver } from '../claude/claude-structured-launch-resolution'
@@ -27,7 +27,9 @@ export type StructuredClaudeRuntimeAdapterDeps = {
   resolveClaudeInheritedEnv?: () => Promise<Record<string, string>>
   /** Managed-account auth state for a Claude launch, mirroring the terminal preflight.
    *  Required: an absent policy is what silently under-strips. */
-  resolveClaudeAuthPolicy: () => Promise<ClaudeStructuredAuthPolicy> | ClaudeStructuredAuthPolicy
+  resolveClaudeAuthPolicy: (
+    home?: AgentSessionAccountHome
+  ) => Promise<ClaudeStructuredAuthPolicy> | ClaudeStructuredAuthPolicy
   /** The user's Agent Permissions setting for Claude; absent means prompting. */
   resolveClaudePermissionMode?: () => Promise<PermissionMode> | PermissionMode
   readClaudeManagedAccountGate?: () => ClaudeManagedAccountGateSettings | null

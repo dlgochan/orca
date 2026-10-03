@@ -10,6 +10,7 @@ import { hasLiveClaudePtys } from '../live-pty-gate'
 import { isOauthTokenExpiring } from '../oauth-refresh'
 import { writeActiveClaudeKeychainCredentialsForRuntime } from '../keychain'
 import { ClaudeRuntimeAuthPreparationService } from './runtime-auth-preparation'
+import { hasIsolatedClaudeAccountAuth } from '../isolated-account-auth'
 
 export class ClaudeRuntimeAuthSync extends ClaudeRuntimeAuthPreparationService {
   protected async doSyncForCurrentSelection(target?: ClaudeAccountSelectionTarget): Promise<void> {
@@ -64,6 +65,28 @@ export class ClaudeRuntimeAuthSync extends ClaudeRuntimeAuthPreparationService {
           }
         }
       }
+    }
+    if (
+      activeAccount?.managedAuthRuntime !== 'wsl' &&
+      activeAccount &&
+      hasIsolatedClaudeAccountAuth(activeAccount.managedAuthPath)
+    ) {
+      const credentials = await this.readManagedCredentials(activeAccount)
+      if (!credentials || !this.isValidCredentialsJsonObject(credentials)) {
+        throw new Error(
+          'This Claude account has no valid isolated credential. Reconnect it in Accounts.'
+        )
+      }
+      if (this.lastSyncedAccountId !== null) {
+        this.store.updateSettings({ claudeProfileMigrationAt: Date.now() })
+        await this.restoreSystemDefaultSnapshot(
+          previousManagedCredentialsJson,
+          previousManagedOauthAccount
+        )
+      }
+      this.lastSyncedAccountId = null
+      this.clearLastWrittenRuntimeState()
+      return
     }
     if (!activeAccount) {
       if (activeAccountId) {

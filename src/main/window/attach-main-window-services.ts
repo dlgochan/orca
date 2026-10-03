@@ -38,6 +38,7 @@ import { startFolderRepoGitUpgradeWatch } from '../ipc/folder-repo-git-upgrade'
 import { scheduleMainWindowAutoUpdaterSetup } from './main-window-updater'
 import { registerRuntimeWindowLifecycle } from './runtime-window-lifecycle'
 import { registerFileDropRelay } from './native-file-drop-relay'
+import type { ClaudeLaunchProfile } from '../../shared/claude-launch-profile'
 
 export { ensureAutoUpdaterConfigured, registerUpdaterHandlers } from './main-window-updater'
 
@@ -52,7 +53,8 @@ export function attachMainWindowServices(
   runtime: OrcaRuntimeService,
   getSelectedCodexHomePath?: GetSelectedCodexHomePath,
   prepareClaudeAuth?: (
-    target?: ClaudeAccountSelectionTarget
+    target?: ClaudeAccountSelectionTarget,
+    profile?: Pick<ClaudeLaunchProfile, 'accountId'>
   ) => Promise<ClaudeRuntimeAuthPreparation>,
   options?: {
     prepareCodexSessionResume?: PrepareCodexSessionResume

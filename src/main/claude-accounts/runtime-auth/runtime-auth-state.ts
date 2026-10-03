@@ -13,5 +13,5 @@ export class ClaudeRuntimeAuthState {
   protected skipNextReadBackForAccountId: string | null = null
   protected managedRefreshDeferredByLivePtyAccountId: string | null = null
 
-  protected constructor(protected readonly store: Store) {}
+  protected constructor(protected readonly store: Pick<Store, 'getSettings' | 'updateSettings'>) {}
 }

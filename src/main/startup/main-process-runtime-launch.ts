@@ -141,7 +141,10 @@ async function launchServeMode(
     runtime,
     prepareCodexRuntimeHomeForLaunch,
     () => state.store!.getSettings(),
-    (target) => state.claudeRuntimeAuth!.prepareForClaudeLaunch(target),
+    (target, profile) =>
+      profile
+        ? state.claudeRuntimeAuth!.prepareForClaudeProfileLaunch(profile.accountId, target)
+        : state.claudeRuntimeAuth!.prepareForClaudeLaunch(target),
     state.store!,
     prepareCodexSessionResumeForLaunch,
     { onCodexHomePtySpawned: handleCodexHomePtySpawned, onPtyExit: handlePtyExit }

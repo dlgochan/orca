@@ -1,7 +1,9 @@
 import { useSyncExternalStore } from 'react'
 import type { AgentSessionHandleProvider } from '../../../shared/agent-session-provider-handle'
+import type { ClaudeLaunchProfile } from '../../../shared/claude-launch-profile'
 import type { AgentSessionWriteRefusal } from '../../../shared/agent-session-write-failure'
-import type { StructuredAgentSessionResumeSource } from '../../../shared/structured-agent-session-create'
+import { structuredLaunchIdentity } from './structured-agent-launch-identity'
+export { structuredLaunchIdentity } from './structured-agent-launch-identity'
 import type { StructuredLaunchRecoveryState } from './structured-agent-session-launch-recovery'
 import type { StructuredLaunchSelection } from './structured-agent-session-launch-options'
 import type {
@@ -66,18 +68,6 @@ export function subscribeStructuredAgentLaunchStatus(listener: () => void): () =
   return () => structuredLaunchListeners.delete(listener)
 }
 
-// Why keyed by agent: one worktree can hold a Claude and a Codex launch at once.
-// Why keyed by conversation: a resume must not coalesce onto an unrelated blank launch.
-export function structuredLaunchIdentity(
-  worktreeId: string,
-  agent: AgentSessionHandleProvider,
-  resumeFrom?: StructuredAgentSessionResumeSource
-): string {
-  return resumeFrom
-    ? `${agent}:${worktreeId}:resume:${resumeFrom.providerSessionId}`
-    : `${agent}:${worktreeId}`
-}
-
 export function getStructuredLaunchState(identity: string): StructuredLaunchState | undefined {
   return pendingStructuredLaunchesByIdentity.get(identity)
 }
@@ -112,9 +102,10 @@ function persistStructuredLaunchState(state: StructuredLaunchState): void {
     deleteStructuredAgentLaunchRecord(state.intent.sessionId)
     return
   }
-  const { envelope, resumeFrom } = state.intent.params
+  const { envelope, resumeFrom, claudeProfile } = state.intent.params
   const record: StructuredAgentLaunchPersistedRecord = {
     sessionId: state.intent.sessionId,
+    ...(claudeProfile ? { claudeProfile } : {}),
     agent: state.intent.agent,
     lifecycle,
     clientOperationId: envelope.clientOperationId,
@@ -324,8 +315,15 @@ export function retireAbsentStructuredAgentSessionLaunchCancellationTombstones(
 
 export function getStructuredAgentLaunchStatus(
   worktreeId: string,
-  agent: AgentSessionHandleProvider
+  agent: AgentSessionHandleProvider,
+  profile?: ClaudeLaunchProfile
 ): StructuredAgentLaunchStatus {
+  if (profile) {
+    const state = getStructuredLaunchState(
+      structuredLaunchIdentity(worktreeId, agent, undefined, profile)
+    )
+    return state ? (state.visibilityUnknown ? 'unknown' : 'pending') : 'idle'
+  }
   // Any launch for this pair, including adopted conversations, means a chat is starting here.
   const states = [
     getStructuredLaunchState(structuredLaunchIdentity(worktreeId, agent)),

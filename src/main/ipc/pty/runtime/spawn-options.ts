@@ -1,4 +1,5 @@
 import { getAppEnvironment } from '../../../../shared/app-environment'
+import { bindClaudeProfileTerminalEnvironment } from '../../../claude-accounts/claude-profile-cli'
 import { getLegacyOpenCodeEnvKeysToDelete } from '../../../opencode/legacy-shared-config-dir'
 import type { IPtyProvider, PtySpawnResult } from '../../../providers/types'
 import { LocalPtyProvider } from '../../../providers/local-pty-provider'
@@ -20,6 +21,7 @@ import {
 } from '../host-env/fresh-spawn-routing'
 import { isTuiAgent } from '../../../../shared/tui-agent-config'
 import { CLAUDE_AUTH_ENV_VARS } from '../../../claude-accounts/environment'
+import { CLAUDE_PROFILE_PROVIDER_ENV_VARS } from '../../../claude-accounts/claude-profile-environment'
 import { LEGACY_TERMINAL_SHIM_REMOTE_ENV_KEYS } from '../../../pty/legacy-terminal-shim-dir'
 import { PI_PROCESS_OWNER_ENV_KEYS } from '../../../pty/pi-process-owner-env'
 import { resolveConfiguredTerminalShellArgs } from '../configured-terminal-shell-args'
@@ -74,6 +76,7 @@ export async function buildRuntimePtySpawnOptions(
   }
   ctx.spawnOptions.envToDelete = mergePtyEnvDeletions(
     authEnvToDelete,
+    ctx.claudeAuth?.isolatedCredentials ? CLAUDE_PROFILE_PROVIDER_ENV_VARS : [],
     args.envToDelete ?? [],
     // Persistent daemons and older SSH hosts must not resurrect a parent Pi's ownership.
     PI_PROCESS_OWNER_ENV_KEYS,
@@ -122,7 +125,7 @@ export async function buildRuntimePtySpawnOptions(
   })
   const launchCommand = noDaemonLaunch ? await noDaemonLaunch : ctx.launchCommand
   if (launchCommand !== undefined) {
-    ctx.spawnOptions.command = launchCommand
+    ctx.spawnOptions.command = bindClaudeProfileTerminalEnvironment(launchCommand, ctx.claudeAuth)
   }
   if (args.commandDelivery !== undefined) {
     ctx.spawnOptions.commandDelivery = args.commandDelivery
@@ -132,6 +135,9 @@ export async function buildRuntimePtySpawnOptions(
   }
   if (isTuiAgent(args.launchAgent)) {
     ctx.spawnOptions.launchAgent = args.launchAgent
+  }
+  if (ctx.claudeAuth?.isolatedCredentials) {
+    ctx.spawnOptions.launchAgent = 'claude'
   }
   if (args.worktreeId !== undefined) {
     ctx.spawnOptions.worktreeId = args.worktreeId

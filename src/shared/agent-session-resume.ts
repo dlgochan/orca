@@ -1,4 +1,5 @@
 import type { AgentHookSource } from './agent-hook-relay'
+import type { ClaudeLaunchProfile } from './claude-launch-profile'
 import type { AgentStatusState } from './agent-status-types'
 import type { AgentMainAgentStatus } from './main-agent-status'
 import type { TuiAgent } from './tui-agent'
@@ -46,6 +47,9 @@ export type AgentProviderSessionMetadata = {
 }
 
 export type SleepingAgentLaunchConfig = {
+  // null captures system auth; absent means legacy managed or uncaptured ownership.
+  claudeAccountId?: string | null
+  claudeProfile?: ClaudeLaunchProfile
   agentCommand?: string
   agentArgs: string
   agentEnv: Record<string, string>

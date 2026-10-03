@@ -15,6 +15,10 @@ export function launchConfigsEqual(
   if (
     a.agentCommand !== b.agentCommand ||
     a.agentArgs !== b.agentArgs ||
+    a.claudeAccountId !== b.claudeAccountId ||
+    a.claudeProfile?.id !== b.claudeProfile?.id ||
+    a.claudeProfile?.accountId !== b.claudeProfile?.accountId ||
+    a.claudeProfile?.name !== b.claudeProfile?.name ||
     a.ompResumeFilePath !== b.ompResumeFilePath
   ) {
     return false

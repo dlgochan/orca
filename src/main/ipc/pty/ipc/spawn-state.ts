@@ -12,6 +12,7 @@ import { localProvider } from '../provider/registry'
 import type { AdoptStablePaneResult, PtySpawnIpcArgs, PtySpawnIpcDeps } from './spawn-types'
 
 export type PtyIpcSpawnState = {
+  releaseClaudeCredentialOwner?: () => void
   deps: PtySpawnIpcDeps
   args: PtySpawnIpcArgs
   spawnTiming: PtySpawnTiming

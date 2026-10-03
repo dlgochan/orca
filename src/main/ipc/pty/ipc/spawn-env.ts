@@ -82,6 +82,15 @@ export async function assemblePtyIpcSpawnEnv(ctx: PtyIpcSpawnState): Promise<voi
       launchConfig: args.launchConfig
     })
   ctx.effectiveLaunchConfig = args.launchConfig
+  if (ctx.isClaudeLaunch && !ctx.preAdoptedStablePane) {
+    ctx.effectiveLaunchConfig = {
+      agentArgs: '',
+      agentEnv: {},
+      ...args.launchConfig,
+      claudeAccountId:
+        ctx.claudeAuth?.accountId ?? (ctx.claudeAuth?.provenance === 'system' ? null : undefined)
+    }
+  }
   const shouldPreAllocateTerminalHandle =
     ctx.deps.runtime !== undefined &&
     ((!(ctx.provider instanceof LocalPtyProvider) &&
@@ -104,11 +113,11 @@ export async function assemblePtyIpcSpawnEnv(ctx: PtyIpcSpawnState): Promise<voi
       ...ctx.baseEnv,
       ...prepared.env
     }
-    if (args.launchConfig) {
+    if (ctx.effectiveLaunchConfig) {
       ctx.effectiveLaunchConfig = {
-        ...args.launchConfig,
+        ...ctx.effectiveLaunchConfig,
         agentEnv: {
-          ...args.launchConfig.agentEnv,
+          ...ctx.effectiveLaunchConfig.agentEnv,
           ...prepared.env
         }
       }

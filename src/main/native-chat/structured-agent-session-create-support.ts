@@ -20,6 +20,7 @@ export function resolveStructuredAgentSessionCreateSupport(input: {
   agent: 'claude' | 'codex'
   location: AgentSessionExecutionLocation
   adapterSupportsCreate: boolean
+  profileBound?: boolean
   getSettings: () => ClaudeManagedAccountGateSettings
 }): StructuredAgentSessionCreateSupport {
   if (!input.adapterSupportsCreate) {
@@ -38,6 +39,7 @@ export function resolveStructuredAgentSessionCreateSupport(input: {
   // workspace — and no client reads the field, so it stays as-is.
   if (
     input.agent === 'claude' &&
+    !input.profileBound &&
     !structuredClaudeMatchesActiveManagedAccount(
       readClaudeManagedAccountGateSettings(input.getSettings)
     )

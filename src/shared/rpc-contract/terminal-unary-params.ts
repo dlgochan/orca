@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isClaudeLaunchProfile, type ClaudeLaunchProfile } from '../claude-launch-profile'
 import { OptionalFiniteNumber, OptionalString, requiredString } from './rpc-param-primitives'
 import { isTuiAgent } from '../tui-agent-config'
 import {
@@ -163,6 +164,12 @@ export const TerminalCreateParams = z.object({
   envToDelete: z.array(z.string().min(1).max(256)).max(32).optional(),
   launchConfig: z
     .object({
+      claudeProfile: z.custom<ClaudeLaunchProfile>(isClaudeLaunchProfile).optional(),
+      claudeAccountId: z
+        .string()
+        .regex(/^[A-Za-z0-9_-]{1,128}$/)
+        .nullable()
+        .optional(),
       agentCommand: z.string().optional(),
       agentArgs: z.string(),
       agentEnv: z.record(z.string(), z.string()),

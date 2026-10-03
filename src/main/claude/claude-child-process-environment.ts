@@ -1,4 +1,5 @@
 import { CLAUDE_AUTH_ENV_VARS, applyClaudeEnvPatch } from '../claude-accounts/environment'
+import { stripClaudeProfileProviderEnvironment } from '../claude-accounts/claude-profile-environment'
 
 const CLAUDE_CHILD_SESSION_STAMP_ENV_KEYS = [
   'CLAUDE_CODE_CHILD_SESSION',
@@ -36,6 +37,7 @@ export function buildClaudeChildProcessEnv(
     inheritedEnv?: NodeJS.ProcessEnv
     platform?: NodeJS.Platform
     scrubConfiguredChildSessionStamps?: boolean
+    isolatedCredentials?: boolean
   } = {}
 ): Record<string, string> {
   const inheritedEnv = options.inheritedEnv ?? process.env
@@ -62,7 +64,11 @@ export function buildClaudeChildProcessEnv(
     }
   }
   if (options.scrubConfiguredChildSessionStamps) {
-    return stripClaudeChildSessionStamps({ ...env, ...configuredEnv }, platform)
+    const merged = { ...env, ...configuredEnv }
+    if (options.isolatedCredentials) {
+      stripClaudeProfileProviderEnvironment(merged)
+    }
+    return stripClaudeChildSessionStamps(merged, platform)
   }
   stripClaudeChildSessionStamps(env, platform)
   return { ...env, ...configuredEnv }

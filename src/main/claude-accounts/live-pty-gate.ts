@@ -1,4 +1,18 @@
 const liveClaudePtyIds = new Set<string>()
+const isolatedClaudePtyIds = new Set<string>()
+const pendingCredentialOwners = new Map<symbol, boolean>()
+
+export function reserveClaudeCredentialOwner(isolated: boolean): () => void {
+  const owner = Symbol('pending Claude launch')
+  pendingCredentialOwners.set(owner, isolated)
+  return () => {
+    pendingCredentialOwners.delete(owner)
+  }
+}
+
+export function hasClaudeCredentialOwners(): boolean {
+  return hasLiveClaudePtys() || pendingCredentialOwners.size > 0
+}
 // Why: ids restored from persistence at startup, not yet confirmed against the
 // daemon. They keep the OAuth refresh gate closed so an early managed refresh
 // cannot rotate the single-use refresh token out from under a Claude CLI that
@@ -74,8 +88,11 @@ export function confirmSeededClaudeLivePtys(aliveSessionIds: readonly string[]):
   notifyDrainedOnTransition(hadLivePtys)
 }
 
-export function markClaudePtySpawned(ptyId: string): void {
+export function markClaudePtySpawned(ptyId: string, isolatedCredentials = false): void {
   liveClaudePtyIds.add(ptyId)
+  if (isolatedCredentials) {
+    isolatedClaudePtyIds.add(ptyId)
+  }
   seededUnconfirmedPtyIds.delete(ptyId)
   persistence?.addClaudeLivePtySessionId(ptyId)
 }
@@ -83,6 +100,7 @@ export function markClaudePtySpawned(ptyId: string): void {
 export function markClaudePtyExited(ptyId: string): void {
   const hadLivePtys = liveClaudePtyIds.size > 0
   liveClaudePtyIds.delete(ptyId)
+  isolatedClaudePtyIds.delete(ptyId)
   seededUnconfirmedPtyIds.delete(ptyId)
   persistence?.removeClaudeLivePtySessionId(ptyId)
   notifyDrainedOnTransition(hadLivePtys)
@@ -101,13 +119,20 @@ export function markClaudePtyExited(ptyId: string): void {
  * children of this process and cannot survive a restart, so seeding them back on the
  * next launch would hold the gate closed for a process that is provably gone.
  */
-export function markClaudeStructuredChildSpawned(childKey: string): void {
+export function markClaudeStructuredChildSpawned(
+  childKey: string,
+  isolatedCredentials = false
+): void {
   liveClaudePtyIds.add(structuredChildGateId(childKey))
+  if (isolatedCredentials) {
+    isolatedClaudePtyIds.add(structuredChildGateId(childKey))
+  }
 }
 
 export function markClaudeStructuredChildExited(childKey: string): void {
   const hadLivePtys = liveClaudePtyIds.size > 0
   liveClaudePtyIds.delete(structuredChildGateId(childKey))
+  isolatedClaudePtyIds.delete(structuredChildGateId(childKey))
   notifyDrainedOnTransition(hadLivePtys)
 }
 
@@ -119,6 +144,14 @@ function structuredChildGateId(childKey: string): string {
 
 export function hasLiveClaudePtys(): boolean {
   return liveClaudePtyIds.size > 0
+}
+
+// Restored daemon sessions have unknown ownership until reattached and remain conservative.
+export function hasLiveLegacyClaudePtys(): boolean {
+  return (
+    [...liveClaudePtyIds].some((id) => !isolatedClaudePtyIds.has(id)) ||
+    [...pendingCredentialOwners.values()].some((isolated) => !isolated)
+  )
 }
 
 export function beginClaudeAuthSwitch(): void {

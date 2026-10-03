@@ -17,6 +17,8 @@ import {
 } from '../../../../shared/tui-agent-selection'
 import { translate } from '@/i18n/i18n'
 import { useStructuredAgentLaunchStatus } from '@/lib/structured-agent-session-launch'
+import { ClaudeProfileMenuItem } from './ClaudeProfileMenuItem'
+import { isWindowsUserAgent } from '@/components/terminal-pane/pane-helpers'
 
 export type QuickLaunchAgentMenuItemsProps = {
   worktreeId: string
@@ -112,6 +114,8 @@ function QuickLaunchAgentMenuItemsInner({
   const agentDetectionTarget = useAgentDetectionTargetForWorktree(worktreeId)
   const { detectedIds } = useDetectedAgents(agentDetectionTarget)
   const defaultAgent = useAppStore((s) => s.settings?.defaultTuiAgent)
+  const profiles = useAppStore((s) => s.settings?.claudeLaunchProfiles)
+  const accounts = useAppStore((s) => s.settings?.claudeManagedAccounts)
   const disabledAgents = useAppStore(
     (s) => s.settings?.disabledTuiAgents ?? DEFAULT_DISABLED_TUI_AGENTS
   )
@@ -131,10 +135,11 @@ function QuickLaunchAgentMenuItemsInner({
   }, [openSettingsPage, openSettingsTarget])
 
   const runLaunch = useCallback(
-    (agent: TuiAgent) => {
+    (agent: TuiAgent, claudeProfileId?: string) => {
       const entry = getCatalogEntry(agent)
       const label = entry?.label ?? agent
       const result = launchAgentInNewTab({
+        ...(claudeProfileId ? { claudeProfileId } : {}),
         agent,
         worktreeId,
         groupId,
@@ -231,6 +236,34 @@ function QuickLaunchAgentMenuItemsInner({
           </DropdownMenuItem>
         )
       })}
+      {agentDetectionTarget?.kind === 'local' &&
+        agents.includes('claude') &&
+        !isWindowsUserAgent() &&
+        profiles?.map((profile) => (
+          <ClaudeProfileMenuItem
+            key={profile.id}
+            profile={profile}
+            worktreeId={worktreeId}
+            email={accounts?.find((account) => account.id === profile.accountId)?.email}
+            disabled={
+              !accounts?.some(
+                (account) =>
+                  account.id === profile.accountId && account.managedAuthRuntime !== 'wsl'
+              )
+            }
+            onSelect={() => {
+              try {
+                runLaunch('claude', profile.id)
+              } catch (error) {
+                toast.error(
+                  error instanceof Error
+                    ? error.message
+                    : translate('claudeProfiles.launchError', 'Could not launch this profile.')
+                )
+              }
+            }}
+          />
+        ))}
       <DropdownMenuItem
         onSelect={openAgentSettings}
         className="gap-2 rounded-[7px] px-2 py-1.5 text-[12px] leading-5 font-medium text-muted-foreground"

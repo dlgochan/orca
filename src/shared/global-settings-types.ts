@@ -1,5 +1,6 @@
 import type { ExecutionHostId } from './execution-host'
 import type { OrcaWorkspaceLayout } from './orca-workspace-layout'
+import type { ClaudeLaunchProfile } from './claude-launch-profile'
 import type { GitHubProjectSettings } from './github/project-types'
 import type { VoiceSettings } from './speech-types'
 import type { AiVaultSearchSettings } from './ai-vault-search-settings'
@@ -323,8 +324,11 @@ export type GlobalSettings = {
   codexManagedAccounts: CodexManagedAccount[]
   activeCodexManagedAccountId: string | null
   activeCodexManagedAccountIdsByRuntime?: CodexManagedAccountRuntimeSelection
-  /** Why: persist only per-account auth (not a CLAUDE_CONFIG_DIR swap) so switching accounts doesn't fork Claude's shared chat/session context. */
+  /** Accounts own credentials; launch profiles bind named sessions to an account. */
   claudeManagedAccounts: ClaudeManagedAccount[]
+  claudeLaunchProfiles?: ClaudeLaunchProfile[]
+  /** Legacy resumes without account ownership must stop after shared credentials are withdrawn. */
+  claudeProfileMigrationAt?: number
   activeClaudeManagedAccountId: string | null
   activeClaudeManagedAccountIdsByRuntime?: ClaudeManagedAccountRuntimeSelection
   /** Per-worktree shell history so ArrowUp doesn't surface other worktrees' commands (a HISTFILE for

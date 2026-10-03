@@ -120,6 +120,7 @@ export async function spawnPtyFromRuntimeController(
     rejectPaneSpawnReservation(ctx.paneSpawnReservationKey, ctx.paneSpawnReservation, err)
     throw err
   } finally {
+    ctx.releaseClaudeCredentialOwner?.()
     ctx.releaseWorktreeSpawn?.()
     ctx.finishTerminalInstall()
   }

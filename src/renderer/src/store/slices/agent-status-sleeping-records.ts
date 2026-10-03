@@ -15,6 +15,8 @@ import { findTabForAgentEntry } from './agent-status-pane-key-tab-binding'
 
 export function copyLaunchConfig(config: SleepingAgentLaunchConfig): SleepingAgentLaunchConfig {
   return {
+    ...(config.claudeAccountId !== undefined ? { claudeAccountId: config.claudeAccountId } : {}),
+    ...(config.claudeProfile ? { claudeProfile: { ...config.claudeProfile } } : {}),
     ...(config.agentCommand ? { agentCommand: config.agentCommand } : {}),
     agentArgs: config.agentArgs,
     agentEnv: { ...config.agentEnv },

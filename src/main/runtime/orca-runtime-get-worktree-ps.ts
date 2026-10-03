@@ -156,8 +156,22 @@ export class OrcaRuntimeWithGetWorktreePs extends OrcaRuntimeWithStartTuiIdleVis
         resolveTuiAgentLaunchEnv('claude', this.requireStore().getSettings().agentDefaultEnv),
       resolveShellEnvironmentPolicy: () =>
         nativeChatShellEnvironmentPolicy(this.requireStore().getSettings()),
-      resolveClaudeAuthPolicy: () =>
-        claudeStructuredAuthPolicyForSettings(this.requireStore().getSettings()),
+      resolveClaudeAuthPolicy: async (home) => {
+        const accountId = home?.claudeProfile?.accountId ?? home?.claudeAccountId
+        if (accountId) {
+          if (!this.prepareClaudeAuth) {
+            throw new Error('Claude profile authentication is unavailable.')
+          }
+          const auth = await this.prepareClaudeAuth({ runtime: 'host' }, { accountId })
+          if (auth.configDir !== home.path) {
+            throw new Error(
+              'The Claude account directory changed. Reconnect this account before resuming.'
+            )
+          }
+          return { stripAuthEnv: true, isolatedCredentials: true }
+        }
+        return claudeStructuredAuthPolicyForSettings(this.requireStore().getSettings())
+      },
       // Re-read per acquisition, like the auth policy above it: the Agent Permissions setting is
       // the one copy of this fact, and the configured CLI arguments never reach a structured launch.
       resolveClaudePermissionMode: () =>

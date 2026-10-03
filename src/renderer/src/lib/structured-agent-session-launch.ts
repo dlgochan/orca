@@ -1,15 +1,11 @@
 import type { AgentSessionHandleProvider } from '../../../shared/agent-session-provider-handle'
 import { structuredAgentLabel } from '@/lib/structured-agent-session-launch-label'
 import {
-  abandonStructuredAgentSessionLaunchIntent,
   createStructuredAgentSessionLaunchIntent,
   retryStructuredAgentSessionLaunchIntent,
   StructuredAgentSessionCreateRefusalError
 } from '@/lib/launch-structured-agent-session'
-import {
-  discardStructuredAgentSessionLaunchOutbox,
-  enqueueStructuredAgentSessionLaunchPrompt
-} from '@/components/native-chat/structured-agent-session-outbox-storage'
+import { enqueueStructuredAgentSessionLaunchPrompt } from '@/components/native-chat/structured-agent-session-outbox-storage'
 import {
   launchAndReconcile,
   reconcileUnknownLaunch,
@@ -32,7 +28,6 @@ import {
   getStructuredAgentSessionLaunchLifecycle,
   getStructuredLaunchState,
   getStructuredLaunchStateBySessionId,
-  markStructuredAgentSessionLaunchCancelled,
   notifyStructuredLaunchListeners,
   retireStructuredAgentSessionLaunchCancellationTombstone,
   setStructuredLaunchState,
@@ -41,6 +36,7 @@ import {
 } from './structured-agent-session-launch-registry'
 import { restorePersistedStructuredLaunchState } from './structured-agent-session-launch-reload'
 import { applyStructuredLaunchHeldOptions } from './structured-agent-session-launch-options'
+export { cancelStructuredAgentLaunch } from './structured-agent-launch-cancel'
 
 export type { StructuredAgentLaunchOptions, StructuredAgentLaunchReceipt }
 export {
@@ -196,7 +192,12 @@ function structuredAgentLaunchState(
   agent: AgentSessionHandleProvider,
   options: StructuredAgentLaunchOptions
 ): StructuredLaunchStateResult {
-  const identity = structuredLaunchIdentity(worktreeId, agent, options.resumeFrom)
+  const identity = structuredLaunchIdentity(
+    worktreeId,
+    agent,
+    options.resumeFrom,
+    options.claudeProfile
+  )
   const existing = getStructuredLaunchState(identity)
   if (existing) {
     const retrying = existing.visibilityUnknown || existing.callers.outcome === 'failed'
@@ -228,9 +229,16 @@ function structuredAgentLaunchState(
   // Only pass the third argument when adopting: every ordinary launch keeps the two-argument call
   // it has always made, so this change adds no trailing `undefined` for call-site assertions to
   // absorb.
-  const intent = options.resumeFrom
-    ? createStructuredAgentSessionLaunchIntent(worktreeId, agent, options.resumeFrom)
-    : createStructuredAgentSessionLaunchIntent(worktreeId, agent)
+  const intent = options.claudeProfile
+    ? createStructuredAgentSessionLaunchIntent(
+        worktreeId,
+        agent,
+        options.resumeFrom,
+        options.claudeProfile
+      )
+    : options.resumeFrom
+      ? createStructuredAgentSessionLaunchIntent(worktreeId, agent, options.resumeFrom)
+      : createStructuredAgentSessionLaunchIntent(worktreeId, agent)
   const text = outboxPromptText(options)
   const stagedPrompt = text
     ? enqueueStructuredAgentSessionLaunchPrompt(intent.sessionId, text)
@@ -270,19 +278,6 @@ function structuredAgentLaunchState(
     state,
     caller
   }
-}
-
-export function cancelStructuredAgentLaunch(worktreeId: string, sessionId: string): boolean {
-  const state = getStructuredLaunchStateBySessionId(sessionId)
-  if (!state) {
-    return false
-  }
-  markStructuredAgentSessionLaunchCancelled(worktreeId, sessionId)
-  discardStructuredAgentSessionLaunchOutbox(state.intent.sessionId)
-  launchDraft.clearStructuredAgentLaunchDraft(state.intent.sessionId)
-  abandonStructuredAgentSessionLaunchIntent(state.intent)
-  notifyStructuredLaunchListeners()
-  return true
 }
 
 export function startStructuredAgentLaunch(

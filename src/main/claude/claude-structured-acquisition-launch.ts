@@ -5,6 +5,16 @@ import {
 } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
 import { stopAgentSessionProviderRoot } from '../native-chat/agent-session-wire/structured-agent-session-provider-exit-proof'
 import { withAgentSessionCreatePhase } from '../observability/agent-session-instrumentation'
+import { isClaudeAuthSwitchInProgress } from '../claude-accounts/live-pty-gate'
+import { CLAUDE_AUTH_SWITCH_IN_PROGRESS_MESSAGE } from '../claude-accounts/environment'
+
+export function assertClaudeAcquisitionAuthReady(): void {
+  if (isClaudeAuthSwitchInProgress()) {
+    throw new AgentSessionPreSpawnError(new Error(CLAUDE_AUTH_SWITCH_IN_PROGRESS_MESSAGE), {
+      reason: 'accountSwitchInProgress'
+    })
+  }
+}
 import type { ClaudeStructuredLaunch } from './claude-structured-launch-resolution'
 import {
   cancelClaudeAcquisitionAttempt,

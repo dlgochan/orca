@@ -1,3 +1,4 @@
+import { prepareClaudeTerminalAuth } from '../host-env/claude-launch-auth'
 import {
   isWslShellName,
   resolveLocalWindowsTerminalRuntimeOptions
@@ -227,9 +228,17 @@ export async function preparePtyIpcSpawnPreflight(ctx: PtyIpcSpawnState): Promis
     ctx.cwd,
     ctx.expectedWslDistro
   )
-  ctx.claudeAuth =
-    ctx.isClaudeLaunch && ctx.deps.prepareClaudeAuth
-      ? await ctx.deps.prepareClaudeAuth(initialSelectionTarget)
-      : null
+  const prepared = await prepareClaudeTerminalAuth({
+    ...args,
+    isClaudeLaunch: ctx.isClaudeLaunch,
+    reattach: Boolean(ctx.preAdoptedStablePane),
+    resumesConversation: Boolean(args.resumeProviderSession),
+    migrationAt: ctx.deps.getSettings?.().claudeProfileMigrationAt,
+    target: initialSelectionTarget,
+    prepare: ctx.deps.prepareClaudeAuth
+  })
+  ctx.claudeAuth = prepared.auth
+  args.command = prepared.command
+  ctx.releaseClaudeCredentialOwner = prepared.release
   ctx.spawnTiming.mark('auth')
 }

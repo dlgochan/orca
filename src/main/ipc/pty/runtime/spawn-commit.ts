@@ -234,7 +234,7 @@ export async function commitRuntimePtySpawn(ctx: RuntimePtySpawnState) {
     ctx.deps.runtime?.noteTerminalSpawnCommand?.(ctx.result.id, ctx.launchCommand ?? null)
   }
   if (ctx.isClaudeLaunch && !ctx.stablePaneOwner) {
-    markClaudePtySpawned(ctx.result.id)
+    markClaudePtySpawned(ctx.result.id, ctx.claudeAuth?.isolatedCredentials)
   }
   if (args.telemetry && !ctx.stablePaneOwner) {
     recordPtySpawnTelemetry(args.telemetry)
@@ -283,6 +283,7 @@ export async function commitRuntimePtySpawn(ctx: RuntimePtySpawnState) {
     })
   }
   const response = {
+    ...(args.launchConfig && !ctx.result.isReattach ? { launchConfig: args.launchConfig } : {}),
     id: ctx.result.id,
     ...(ctx.result.incarnationId ? { incarnationId: ctx.result.incarnationId } : {}),
     ...(ctx.stablePaneOwner && (ctx.stablePaneOwner.handle || args.preAllocatedHandle)

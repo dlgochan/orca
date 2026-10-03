@@ -25,11 +25,17 @@ export function restorePersistedStructuredLaunchState(
     clientOperationId: record.clientOperationId,
     payloadFingerprint: record.payloadFingerprint,
     expectedRuntimeFence: record.expectedRuntimeFence,
+    ...(record.claudeProfile ? { claudeProfile: record.claudeProfile } : {}),
     ...(record.resumeFrom ? { resumeFrom: record.resumeFrom } : {})
   })
   const callers: StructuredLaunchCallerGroup = createStructuredLaunchCallerGroup()
   const state: StructuredLaunchState = {
-    identity: structuredLaunchIdentity(worktreeId, record.agent, record.resumeFrom),
+    identity: structuredLaunchIdentity(
+      worktreeId,
+      record.agent,
+      record.resumeFrom,
+      record.claudeProfile
+    ),
     intent,
     promptDelivery: 'draft',
     promise: Promise.resolve({ sessionId: record.sessionId, fence: 0 }),

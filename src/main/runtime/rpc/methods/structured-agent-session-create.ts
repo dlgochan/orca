@@ -13,6 +13,7 @@
  */
 
 import { refuse } from '../../../../shared/agent-session-wire-refusals'
+import type { ClaudeLaunchProfile } from '../../../../shared/claude-launch-profile'
 import { computeAgentSessionPayloadFingerprint } from '../../../../shared/agent-session-mutation-envelope'
 import type {
   AgentSessionAttachResult,
@@ -47,6 +48,7 @@ export type PreparedStructuredAgentSessionCreate = {
  * chat's tab holds. The canonicalizer drops `undefined`, so plain creates keep the digest they had.
  */
 export function structuredAgentSessionCreateIntentFingerprint(params: {
+  claudeProfile?: ClaudeLaunchProfile
   envelope: AgentSessionMutationEnvelope
   worktree: string
   agent: string
@@ -58,6 +60,7 @@ export function structuredAgentSessionCreateIntentFingerprint(params: {
     sessionId: params.envelope.sessionId,
     fields: {
       worktree: params.worktree,
+      claudeProfile: params.claudeProfile,
       agent: params.agent,
       resumeFrom: params.resumeFrom,
       tabId: params.tabId
@@ -68,6 +71,7 @@ export function structuredAgentSessionCreateIntentFingerprint(params: {
 /** The pre-commit half. Throws; the caller is expected to run it inside
  *  `resolveUncommittedStructuredCreate` so a failure reaches the client as a refusal. */
 export async function prepareStructuredAgentSessionCreateForWorktree(args: {
+  claudeProfile?: ClaudeLaunchProfile
   runtime: OrcaRuntimeService
   /** Installs the host lazily; called at the same point the RPC handler always installed it. */
   ensureHost: () => Promise<StructuredAgentSessionHost>
@@ -90,6 +94,7 @@ export async function prepareStructuredAgentSessionCreateForWorktree(args: {
     envelope: args.envelope,
     worktree: args.worktree,
     agent: args.agent,
+    ...(args.claudeProfile ? { claudeProfile: args.claudeProfile } : {}),
     callerKey: args.caller.callerKey,
     ...(args.resumeFrom ? { resumeFrom: args.resumeFrom } : {})
   })

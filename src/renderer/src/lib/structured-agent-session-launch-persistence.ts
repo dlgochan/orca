@@ -1,9 +1,14 @@
 import type { AgentSessionHandleProvider } from '../../../shared/agent-session-provider-handle'
+import {
+  isClaudeLaunchProfile,
+  type ClaudeLaunchProfile
+} from '../../../shared/claude-launch-profile'
 import type { StructuredAgentSessionResumeSource } from '../../../shared/structured-agent-session-create'
 
 export type StructuredAgentLaunchPersistedLifecycle = 'pending' | 'visibility-unknown' | 'failed'
 
 export type StructuredAgentLaunchPersistedRecord = {
+  claudeProfile?: ClaudeLaunchProfile
   sessionId: string
   agent: AgentSessionHandleProvider
   lifecycle: StructuredAgentLaunchPersistedLifecycle
@@ -43,6 +48,9 @@ function validRecord(value: unknown): value is StructuredAgentLaunchPersistedRec
   } = value
   const resumeFrom = 'resumeFrom' in value ? value.resumeFrom : undefined
   return (
+    (!('claudeProfile' in value) ||
+      value.claudeProfile === undefined ||
+      isClaudeLaunchProfile(value.claudeProfile)) &&
     typeof sessionId === 'string' &&
     sessionId.length > 0 &&
     (agent === 'claude' || agent === 'codex') &&

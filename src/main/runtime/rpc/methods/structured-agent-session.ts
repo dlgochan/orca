@@ -178,6 +178,7 @@ export const STRUCTURED_AGENT_SESSION_METHODS = [
             agent: params.agent as 'claude' | 'codex',
             caller: callerFor(ctx),
             ...(params.resumeFrom ? { resumeFrom: params.resumeFrom } : {}),
+            ...(params.claudeProfile ? { claudeProfile: params.claudeProfile } : {}),
             ...(params.tabId ? { tabId: params.tabId } : {})
           })
         }

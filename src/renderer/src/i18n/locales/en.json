@@ -18857,5 +18857,26 @@
         "accounts": "accounts"
       }
     }
+  },
+  "claudeProfiles": {
+    "saveError": "Could not save this profile.",
+    "edit": "Edit",
+    "add": "Add profile",
+    "name": "Profile name",
+    "account": "Claude account",
+    "chooseAccount": "Choose an account",
+    "description": "Uses this account in a separate Claude home. Existing conversations keep their original account.",
+    "addAccountFirst": "Add a Claude account in Accounts first.",
+    "cancel": "Cancel",
+    "saving": "Saving…",
+    "save": "Save profile",
+    "removed": "Profile removed. Existing sessions keep their account.",
+    "removeError": "Could not remove this profile.",
+    "section": "Claude profiles",
+    "manageAccounts": "Manage accounts",
+    "reconnect": "Account unavailable — edit to reconnect",
+    "remove": "Remove",
+    "unavailable": "Account unavailable",
+    "launchError": "Could not launch this profile."
   }
 }

@@ -12,7 +12,7 @@
 
 import type { PermissionMode } from '@anthropic-ai/claude-agent-sdk'
 import { existsSync } from 'node:fs'
-import type { AgentSessionRecord } from '../../shared/agent-session-record'
+import type { AgentSessionRecord, AgentSessionAccountHome } from '../../shared/agent-session-record'
 import type { AgentSessionResumeTrigger } from '../../shared/agent-session-resume-marker'
 import {
   structuredAgentSessionTeardownTrigger,
@@ -106,7 +106,9 @@ export type StructuredAgentSessionRuntimeDeps = {
   resolveLaunchEnvOverlay?: () => Promise<Record<string, string>> | Record<string, string>
   resolveClaudeLaunchEnv?: () => Promise<Record<string, string>> | Record<string, string>
   /** Required, and asserted at install time — an absent policy must not degrade to a guess. */
-  resolveClaudeAuthPolicy: () => Promise<ClaudeStructuredAuthPolicy> | ClaudeStructuredAuthPolicy
+  resolveClaudeAuthPolicy: (
+    home?: AgentSessionAccountHome
+  ) => Promise<ClaudeStructuredAuthPolicy> | ClaudeStructuredAuthPolicy
   /** The user's Agent Permissions setting for Claude; absent means prompting. */
   resolveClaudePermissionMode?: () => Promise<PermissionMode> | PermissionMode
   /** The same setting for Codex, as app-server thread policy. */

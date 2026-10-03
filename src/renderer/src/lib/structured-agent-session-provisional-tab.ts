@@ -18,6 +18,7 @@ export function openStructuredAgentSessionProvisionalTab(args: {
   worktreeId: string
   sessionId: string
   agent: 'claude' | 'codex'
+  profileName?: string
   targetGroupId?: string
   activate?: boolean
 }): Tab {
@@ -42,7 +43,7 @@ export function openStructuredAgentSessionProvisionalTab(args: {
     entityId: args.sessionId,
     executionHostId: LOCAL_EXECUTION_HOST_ID,
     agentSessionAgent: args.agent,
-    label: defaultAgentChatLabel(args.agent),
+    label: args.profileName ?? defaultAgentChatLabel(args.agent),
     ...(args.targetGroupId ? { targetGroupId: args.targetGroupId } : {}),
     activate: args.activate !== false
   })
@@ -81,6 +82,7 @@ export function beginStructuredAgentSessionProvisionalLaunch(args: {
         worktreeId,
         sessionId: handle.sessionId,
         agent: args.plan.agent,
+        ...(args.plan.claudeProfile ? { profileName: args.plan.claudeProfile.name } : {}),
         ...(args.targetGroupId ? { targetGroupId: args.targetGroupId } : {}),
         ...(args.activate !== undefined ? { activate: args.activate } : {})
       })

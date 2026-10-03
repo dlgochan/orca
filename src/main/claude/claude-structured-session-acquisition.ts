@@ -1,10 +1,8 @@
-import {
-  AgentSessionPreSpawnError,
-  type AgentSessionAcquisition,
-  type StructuredAgentSessionAcquireInput
+import type {
+  AgentSessionAcquisition,
+  StructuredAgentSessionAcquireInput
 } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
-import { CLAUDE_AUTH_SWITCH_IN_PROGRESS_MESSAGE } from '../claude-accounts/environment'
-import { isClaudeAuthSwitchInProgress } from '../claude-accounts/live-pty-gate'
+import { reserveClaudeCredentialOwner } from '../claude-accounts/live-pty-gate'
 import { openClaudeStreamJsonConnection } from './claude-stream-json-connection'
 import { buildClaudePermissionCallbacks } from './claude-structured-inbound-control'
 import { resolveClaudeReplayTurn } from './claude-replay-turn-resolution'
@@ -40,7 +38,10 @@ import { withObservedProviderExit } from '../native-chat/agent-session-wire/stru
 import { readClaudeTranscriptEntryUuid } from './claude-transcript-entry-uuid'
 import { persistClaudeTurnResumePoint } from './claude-structured-resume-point'
 import { withAgentSessionCreatePhase } from '../observability/agent-session-instrumentation'
-import { resolveClaudeAcquisitionLaunch } from './claude-structured-acquisition-launch'
+import {
+  resolveClaudeAcquisitionLaunch,
+  assertClaudeAcquisitionAuthReady
+} from './claude-structured-acquisition-launch'
 import { agentModelCatalogSessionAccess } from '../native-chat/agent-model-catalog/agent-model-catalog-fingerprint'
 import {
   bindClaudeConnectionJournalControls,
@@ -64,11 +65,7 @@ export async function acquireClaudeSession({
 }): Promise<AgentSessionAcquisition> {
   // A managed-account switch is mid-swap of the pinned credential home; refuse here,
   // before this acquisition cancels the previous attempt and closes the live session.
-  if (isClaudeAuthSwitchInProgress()) {
-    throw new AgentSessionPreSpawnError(new Error(CLAUDE_AUTH_SWITCH_IN_PROGRESS_MESSAGE), {
-      reason: 'accountSwitchInProgress'
-    })
-  }
+  assertClaudeAcquisitionAuthReady()
   const sessionId = input.identity.sessionId
   const prompts = new ClaudePromptRegistry()
   const { previous, attempt } = acquisitions.start(sessionId, prompts)
@@ -160,6 +157,7 @@ export async function acquireClaudeSession({
       callbacks.deliver(attempt, sessionId, () => callbacks.emit(liveSession, input.events, event))
   })
 
+  const releaseCredentialOwner = reserveClaudeCredentialOwner(false)
   try {
     const launch = await resolveClaudeAcquisitionLaunch({
       input,
@@ -178,6 +176,7 @@ export async function acquireClaudeSession({
       open(
         {
           pathToClaudeCodeExecutable: launch.pathToClaudeCodeExecutable,
+          isolatedCredentials: launch.isolatedCredentials,
           options: launch.options,
           cwd: launch.cwd,
           env: {
@@ -324,6 +323,7 @@ export async function acquireClaudeSession({
     acquisitions.deleteIfCurrent(sessionId, attempt)
     throw acquisitionError
   } finally {
+    releaseCredentialOwner()
     attempt.finish()
   }
 }

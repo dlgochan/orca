@@ -1,4 +1,7 @@
 import { inheritOmpLaunchEnvironment } from '../host-env/omp-launch-environment'
+import { prepareRuntimeClaudeAuth } from './spawn-claude-auth'
+import { isClaudeAuthSwitchInProgress } from '../../../claude-accounts/live-pty-gate'
+import { CLAUDE_AUTH_SWITCH_IN_PROGRESS_MESSAGE } from '../../../claude-accounts/environment'
 import { getAppEnvironment } from '../../../../shared/app-environment'
 import type { PtySpawnResult } from '../../../providers/types'
 import { LocalPtyProvider } from '../../../providers/local-pty-provider'
@@ -22,12 +25,6 @@ import {
 } from '../host-env/fresh-spawn-routing'
 import { stripRemotePaneEnvWhenHooksDisabled } from '../provider/liveness'
 import { isTuiAgent } from '../../../../shared/tui-agent-config'
-import { isClaudeAuthSwitchInProgress } from '../../../claude-accounts/live-pty-gate'
-import {
-  CLAUDE_AUTH_ENV_CONFLICT_MESSAGE,
-  CLAUDE_AUTH_SWITCH_IN_PROGRESS_MESSAGE,
-  hasClaudeAuthEnvConflict
-} from '../../../claude-accounts/environment'
 import {
   isSafePtySessionId,
   mintPtySessionId,
@@ -145,16 +142,7 @@ export async function prepareRuntimePtySpawn(
   // Why: the drop still applies here, but this controller's result has no field for
   // notifyResumeUnavailable — runtime/relay panes start fresh without the notice.
   ctx.launchCommand = codexResumeLaunch.command
-  ctx.claudeAuth =
-    ctx.isClaudeLaunch && ctx.deps.prepareClaudeAuth
-      ? await ctx.deps.prepareClaudeAuth(ctx.codexSelectionTarget)
-      : null
-  if (ctx.isClaudeLaunch && isClaudeAuthSwitchInProgress()) {
-    throw new Error(CLAUDE_AUTH_SWITCH_IN_PROGRESS_MESSAGE)
-  }
-  if (ctx.claudeAuth?.stripAuthEnv && hasClaudeAuthEnvConflict(args.env)) {
-    throw new Error(CLAUDE_AUTH_ENV_CONFLICT_MESSAGE)
-  }
+  await prepareRuntimeClaudeAuth(ctx)
 
   ctx.shouldPersistHostSessionBinding = args.persistHostSessionBinding === true
   if (ctx.shouldPersistHostSessionBinding) {

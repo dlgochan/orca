@@ -1,4 +1,10 @@
 import { createHash } from 'node:crypto'
+import { assertClaudeProfileCli } from '../claude-accounts/claude-profile-cli'
+import {
+  assertClaudeProfileEnvironment,
+  stripClaudeProfileProviderEnvironment
+} from '../claude-accounts/claude-profile-environment'
+import type { AgentSessionAccountHome } from '../../shared/agent-session-record'
 import { join } from 'node:path'
 import type {
   Options as ClaudeAgentSdkOptions,
@@ -89,6 +95,7 @@ export function claudeStructuredPermissionOptions(
 }
 
 export type ClaudeStructuredLaunch = {
+  isolatedCredentials?: boolean
   /** Always Orca's resolved user CLI: the SDK's bundled binaries are excluded from the install. */
   pathToClaudeCodeExecutable: string
   options: ClaudeStructuredSdkOptions
@@ -106,7 +113,7 @@ export type ClaudeStructuredLaunch = {
 }
 
 export type ClaudeStructuredLaunchResolverDeps = {
-  store: AgentSessionRecordStore
+  store: Pick<AgentSessionRecordStore, 'getRecord'>
   resolveWorkspacePath: (workspaceId: string) => Promise<string>
   resolveCommand?: () => string
   resolveEnv?: () =>
@@ -121,7 +128,9 @@ export type ClaudeStructuredLaunchResolverDeps = {
    * failure is silent — so every caller states the account's policy rather than
    * inherit a guess. Build it with claudeStructuredAuthPolicyForSettings.
    */
-  resolveAuthPolicy: () => Promise<ClaudeStructuredAuthPolicy> | ClaudeStructuredAuthPolicy
+  resolveAuthPolicy: (
+    home?: AgentSessionAccountHome
+  ) => Promise<ClaudeStructuredAuthPolicy> | ClaudeStructuredAuthPolicy
   /** The user's Agent Permissions setting, re-read per acquisition. Absent means prompting. */
   resolvePermissionMode?: () => Promise<PermissionMode> | PermissionMode
   /** How long an in-flight account switch may hold a launch before it is refused. */
@@ -145,7 +154,11 @@ async function claudeTranscriptExists(input: {
   return path !== null
 }
 
-export type ClaudeStructuredInvocation = { command: string; env: Record<string, string> }
+export type ClaudeStructuredInvocation = {
+  command: string
+  env: Record<string, string>
+  isolatedCredentials?: boolean
+}
 
 /**
  * The one place a structured Claude child's binary and environment are
@@ -167,6 +180,11 @@ export async function resolveClaudeStructuredInvocation(
   const inheritedEnv = deps.resolveInheritedEnv
     ? await deps.resolveInheritedEnv()
     : cloneDefinedEnv(process.env)
+  if (auth.isolatedCredentials) {
+    await assertClaudeProfileCli(command)
+    assertClaudeProfileEnvironment(overlay)
+    stripClaudeProfileProviderEnvironment(inheritedEnv)
+  }
   // A switch can begin while the policy and overlay resolve, exactly as it can
   // during the terminal preflight's prepareClaudeAuth — recheck after the awaits.
   await assertClaudeAuthSwitchSettled(deps.authSwitchSettleTimeoutMs)
@@ -197,7 +215,7 @@ export async function resolveClaudeStructuredInvocation(
     }),
     { platform: process.platform }
   )
-  return { command, env }
+  return { command, env, ...(auth.isolatedCredentials ? { isolatedCredentials: true } : {}) }
 }
 
 /**
@@ -253,7 +271,22 @@ export function createClaudeStructuredLaunchResolver(
     // a reacquire after an unexpected exit would otherwise spawn under whatever it has become.
     // Codex has no gate here — it resolves its account on a different path.
     const gate = deps.readManagedAccountGate?.()
-    if (gate !== undefined && !structuredClaudeMatchesActiveManagedAccount(gate)) {
+    if (
+      gate?.claudeProfileMigrationAt &&
+      record.createdAt < gate.claudeProfileMigrationAt &&
+      !record.accountHome.claudeProfile &&
+      !record.accountHome.claudeAccountId
+    ) {
+      throw new AgentSessionPreSpawnError(
+        'This saved Claude conversation predates account isolation and has no verified account binding. Open its history with the original account before resuming.'
+      )
+    }
+    if (
+      !record.accountHome.claudeProfile &&
+      !record.accountHome.claudeAccountId &&
+      gate !== undefined &&
+      !structuredClaudeMatchesActiveManagedAccount(gate)
+    ) {
       // Unreadable account state names no situation a person can act on, so only the log reads it.
       throw new AgentSessionPreSpawnError(
         'structured Claude is not offered under the active managed Claude account',
@@ -287,16 +320,19 @@ export function createClaudeStructuredLaunchResolver(
     const permission = claudeStructuredPermissionOptions(
       (await deps.resolvePermissionMode?.()) ?? 'default'
     )
-    const { command, env } = await resolveClaudeStructuredInvocation(deps, (base) =>
-      // Every structured session speaks orchestration as itself: its injected id and the Orca CLI.
-      structuredSessionChildIdentityEnv(record.sessionId, {
-        ...base,
-        // The turn translator relies on Claude's authoritative idle frame when no result arrives.
-        [CLAUDE_SESSION_STATE_EVENTS_ENV]: '1'
-      })
+    const { command, env, isolatedCredentials } = await resolveClaudeStructuredInvocation(
+      { ...deps, resolveAuthPolicy: () => deps.resolveAuthPolicy(record.accountHome) },
+      (base) =>
+        // Every structured session speaks orchestration as itself: its injected id and the Orca CLI.
+        structuredSessionChildIdentityEnv(record.sessionId, {
+          ...base,
+          // The turn translator relies on Claude's authoritative idle frame when no result arrives.
+          [CLAUDE_SESSION_STATE_EVENTS_ENV]: '1'
+        })
     )
     return {
       pathToClaudeCodeExecutable: command,
+      ...(isolatedCredentials ? { isolatedCredentials: true } : {}),
       options: {
         ...CLAUDE_STRUCTURED_BASE_OPTIONS,
         ...permission,

@@ -16,6 +16,7 @@ import {
  */
 
 import type { ExecutionHostId } from './execution-host'
+import { isClaudeLaunchProfile, type ClaudeLaunchProfile } from './claude-launch-profile'
 import {
   isAgentSessionConversationCommandRecord,
   type AgentSessionConversationCommandRecord
@@ -45,6 +46,8 @@ export type AgentSessionExecutionLocation = {
 
 /** Account root pinned at launch by the account selector, so a resume cannot drift to another login. */
 export type AgentSessionAccountHome = {
+  claudeAccountId?: string
+  claudeProfile?: ClaudeLaunchProfile
   variable: 'CLAUDE_CONFIG_DIR' | 'CODEX_HOME'
   /** Host-resolved absolute path in the execution host's own path syntax. */
   path: string
@@ -233,6 +236,11 @@ function isAgentSessionAccountHome(value: unknown): value is AgentSessionAccount
   const home = value as Partial<AgentSessionAccountHome>
   return (
     (home.variable === 'CLAUDE_CONFIG_DIR' || home.variable === 'CODEX_HOME') &&
+    (home.claudeAccountId === undefined ||
+      (home.variable === 'CLAUDE_CONFIG_DIR' &&
+        isBoundedString(home.claudeAccountId, MAX_ID_LENGTH))) &&
+    (home.claudeProfile === undefined ||
+      (home.variable === 'CLAUDE_CONFIG_DIR' && isClaudeLaunchProfile(home.claudeProfile))) &&
     isBoundedString(home.path, MAX_PATH_LENGTH)
   )
 }

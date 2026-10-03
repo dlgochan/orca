@@ -51,6 +51,8 @@ import {
 import { AgentAvailabilityControl, type AgentCatalogRowProps } from './AgentCatalogRow'
 import { AgentDefaultSetting } from './AgentDefaultSetting'
 import { AgentDetectionCatalog } from './AgentDetectionCatalog'
+import { ClaudeLaunchProfiles } from './ClaudeLaunchProfiles'
+import { isWindowsUserAgent } from '@/components/terminal-pane/pane-helpers'
 
 export {
   buildAgentAvailabilitySettingsUpdate,
@@ -206,6 +208,13 @@ export function AgentsPane({
     isDetected: boolean
   ): AgentCatalogRowProps => ({
     agentId: agent.id,
+    children:
+      agent.id === 'claude' &&
+      !activeServerEnvironmentId &&
+      !isPairedWebClientWindow() &&
+      !isWindowsUserAgent() ? (
+        <ClaudeLaunchProfiles settings={settings} updateSettings={updateSettings} />
+      ) : undefined,
     label: agent.label,
     homepageUrl: agent.homepageUrl,
     defaultCmd: agent.cmd,

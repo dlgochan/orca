@@ -61,7 +61,7 @@ export function createPtyShellLaunchPlan(
   let windowsFallbackAttempts: WindowsShellSpawnAttempt[] = []
   const startupAgentRecognition = recognizeAgentProcessFromCommandLine(opts.command)
   const requestedCwd = opts.cwd || resolveSafePtyDefaultCwd()
-  if (opts.command && startupAgentRecognition) {
+  if (opts.command && (startupAgentRecognition || opts.launchAgent === 'claude')) {
     assertSafeAgentStartupCwd(requestedCwd, opts.command)
   }
   let spawnCwd = requestedCwd

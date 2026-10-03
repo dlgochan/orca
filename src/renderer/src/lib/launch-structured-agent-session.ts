@@ -1,4 +1,5 @@
 import type { AgentSessionHandleProvider } from '../../../shared/agent-session-provider-handle'
+import type { ClaudeLaunchProfile } from '../../../shared/claude-launch-profile'
 import type {
   AgentSessionAttachResult,
   AgentSessionMutationResult
@@ -111,17 +112,25 @@ function definitiveStructuredAgentSessionCreateErrorCode(error: unknown): string
 export function createStructuredAgentSessionLaunchIntent(
   worktreeId: string,
   agent: AgentSessionHandleProvider,
-  resumeFrom?: StructuredAgentSessionResumeSource
+  resumeFrom?: StructuredAgentSessionResumeSource,
+  claudeProfile?: ClaudeLaunchProfile
 ): StructuredAgentSessionLaunchIntent {
   const sessionId = createStructuredAgentSessionId(agent, createBrowserUuid)
-  return buildStructuredAgentSessionLaunchIntent(worktreeId, agent, sessionId, resumeFrom)
+  return buildStructuredAgentSessionLaunchIntent(
+    worktreeId,
+    agent,
+    sessionId,
+    resumeFrom,
+    claudeProfile
+  )
 }
 
 function buildStructuredAgentSessionLaunchIntent(
   worktreeId: string,
   agent: AgentSessionHandleProvider,
   sessionId: string,
-  resumeFrom?: StructuredAgentSessionResumeSource
+  resumeFrom?: StructuredAgentSessionResumeSource,
+  claudeProfile?: ClaudeLaunchProfile
 ): StructuredAgentSessionLaunchIntent {
   const state = useAppStore.getState()
   recordWebSessionFocusIntent(
@@ -140,6 +149,7 @@ function buildStructuredAgentSessionLaunchIntent(
       worktree: toRuntimeWorktreeSelector(worktreeId),
       agent,
       ...(resumeFrom ? { resumeFrom } : {}),
+      ...(claudeProfile ? { claudeProfile } : {}),
       randomUuid: createBrowserUuid
     }),
     ...launchSeedOptions(state, agent)
@@ -154,12 +164,14 @@ export function retryStructuredAgentSessionLaunchIntent(
     intent.worktreeId,
     intent.agent,
     intent.sessionId,
-    intent.params.resumeFrom
+    intent.params.resumeFrom,
+    intent.params.claudeProfile
   )
 }
 
 /** Rebuild a reload-surviving intent with the caller's current worktree selector. */
 export function restoreStructuredAgentSessionLaunchIntent(args: {
+  claudeProfile?: ClaudeLaunchProfile
   worktreeId: string
   sessionId: string
   agent: AgentSessionHandleProvider
@@ -189,7 +201,8 @@ export function restoreStructuredAgentSessionLaunchIntent(args: {
       },
       worktree: toRuntimeWorktreeSelector(args.worktreeId),
       agent: args.agent,
-      ...(args.resumeFrom ? { resumeFrom: args.resumeFrom } : {})
+      ...(args.resumeFrom ? { resumeFrom: args.resumeFrom } : {}),
+      ...(args.claudeProfile ? { claudeProfile: args.claudeProfile } : {})
     },
     ...launchSeedOptions(state, args.agent)
   }

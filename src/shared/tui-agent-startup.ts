@@ -40,6 +40,8 @@ function appliedSessionOptionProps(values: Record<string, SessionOptionValue>) {
 }
 
 export function buildAgentStartupPlan(args: {
+  claudeAccountId?: string | null
+  claudeProfile?: SleepingAgentLaunchConfig['claudeProfile']
   agent: TuiAgent
   prompt: string
   cmdOverrides: Partial<Record<TuiAgent, string>>
