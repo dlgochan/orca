@@ -44,6 +44,14 @@ describe('explicit command home resolution', () => {
     expect(candidate.executable).toBe(canonicalExecutable)
     expect(candidate.resolvedHome).toBe(home)
   })
+  it('accepts explicit home assignment with the trusted canonical executable', async () => {
+    const candidate = await service().preview({
+      agent: 'claude',
+      source: { kind: 'command', value: `CLAUDE_CONFIG_DIR="${home}" "${canonicalExecutable}"` }
+    })
+    expect(candidate.executable).toBe(canonicalExecutable)
+    expect(candidate.resolvedHome).toBe(home)
+  })
   it('requires folder selection for every command without an explicit home, including a shadowed CLI', async () => {
     await mkdir(join(root, '.claude'))
     const svc = service(`alias claude='CLAUDE_CONFIG_DIR="${home}" claude'`)

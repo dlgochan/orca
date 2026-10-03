@@ -96,15 +96,20 @@ export class AgentProfileConnectionService {
           hostHome: host.home,
           platform: host.platform
         }
-        const parsed = /^[A-Za-z0-9_.-]{1,128}$/.test(path)
-          ? discoverLiteralProfileAlias(
-              path,
-              await (
-                this.dependencies.readAliases ?? (() => readConventionalProfileAliases(host))
-              )(),
-              context
-            )
-          : parseProfileCommand(path, context)
+        const isAliasName = /^[A-Za-z0-9_.-]{1,128}$/.test(path)
+        const sources = isAliasName
+          ? await (this.dependencies.readAliases ?? (() => readConventionalProfileAliases(host)))()
+          : []
+        const discover = (trustedExecutable: string) => {
+          const trustedContext = { ...context, executable: trustedExecutable }
+          return isAliasName
+            ? discoverLiteralProfileAlias(path, sources, trustedContext)
+            : parseProfileCommand(path, trustedContext)
+        }
+        let parsed = discover(detected)
+        if (parsed.kind !== 'resolved' && detected !== executable) {
+          parsed = discover(executable)
+        }
         if (parsed.kind !== 'resolved') {
           throw new Error('Command cannot be safely resolved. Choose a configuration folder.')
         }
