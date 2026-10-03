@@ -1,9 +1,9 @@
-import { assertTerminalProfilesStayLocal } from './terminal-profile-routing'
+import { assertTerminalProfilesStayLocal } from '../../shared/terminal-profile-routing'
 import { describe, expect, it } from 'vitest'
-import { sleepingAgentLaunchConfigSchema } from './workspace-session-sleeping-agents'
-import { buildSleepingAgentLaunchConfig } from './sleeping-agent-launch-config'
-import { copySleepingAgentLaunchConfig } from '../main/runtime/runtime-agent-launch-resolution'
-import type { AgentProfileSnapshot } from './agent-launch-profile'
+import { sleepingAgentLaunchConfigSchema } from '../../shared/workspace-session-sleeping-agents'
+import { buildSleepingAgentLaunchConfig } from '../../shared/sleeping-agent-launch-config'
+import { copySleepingAgentLaunchConfig } from './runtime-agent-launch-resolution'
+import type { AgentProfileSnapshot } from '../../shared/agent-launch-profile'
 
 const snapshot: AgentProfileSnapshot = {
   id: 'work',

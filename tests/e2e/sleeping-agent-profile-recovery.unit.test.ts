@@ -2,21 +2,22 @@
 import { mkdtemp, mkdir, writeFile, chmod, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { AgentProfileConnectionService } from '../../../main/agent-profiles/connection-service'
+import { AgentProfileConnectionService } from '../../src/main/agent-profiles/connection-service'
 import {
   createClaudeProfileAdapter,
   createCodexProfileAdapter
-} from '../../../main/agent-profiles/provider-adapters'
+} from '../../src/main/agent-profiles/provider-adapters'
 import { afterEach, expect, it, vi } from 'vitest'
-import type { AgentProfileSnapshot } from '../../../shared/agent-launch-profile'
-import { parseWorkspaceSession } from '../../../shared/workspace-session-schema'
+import type { AgentProfileSnapshot } from '../../src/shared/agent-launch-profile'
+import { parseWorkspaceSession } from '../../src/shared/workspace-session-schema'
+import { getDefaultSettings } from '../../src/shared/constants'
 import { useAppStore } from '@/store'
-import { launchSleepingAgentSession } from './sleeping-agent-session-launch'
+import { launchSleepingAgentSession } from '@/lib/sleeping-agent-session-launch'
 import {
   launchConfigsEqual,
   recoveryRecordMatches
-} from '../store/slices/agent-status-recovery-equivalence'
-import type { SleepingAgentSessionRecord } from '../../../shared/agent-session-resume'
+} from '@/store/slices/agent-status-recovery-equivalence'
+import type { SleepingAgentSessionRecord } from '../../src/shared/agent-session-resume'
 
 const initial = useAppStore.getState()
 afterEach(() => {
@@ -147,6 +148,7 @@ it.each(['edited', 'unlinked'] as const)(
     const saved = record()
     useAppStore.setState({
       settings: {
+        ...getDefaultSettings('/tmp/profile-recovery'),
         ...initial.settings,
         agentLaunchProfiles:
           operation === 'edited'

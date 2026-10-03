@@ -45,7 +45,7 @@ it.each(['claude', 'codex'] as const)(
           id: 'a',
           name: 'A',
           agent,
-          hostId: 'local',
+          hostId: 'local' as const,
           executable: '/cli',
           binding: { kind: 'managed', accountId: 'a' } as const
         }

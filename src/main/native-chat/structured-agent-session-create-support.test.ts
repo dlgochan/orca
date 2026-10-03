@@ -67,7 +67,7 @@ describe('resolveStructuredAgentSessionCreateSupport', () => {
     'refuses %s profile targets even if an adapter supports them',
     (agent) => {
       for (const location of [
-        { ...LOCAL, executionHostId: 'ssh:host-a' },
+        { ...LOCAL, executionHostId: 'ssh:host-a' as const },
         { ...LOCAL, wslDistro: 'Ubuntu' }
       ]) {
         expect(support({ agent, location, profileBound: true }).supported).toBe(false)

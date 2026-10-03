@@ -5,22 +5,22 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { getDefaultPersistedState } from '../../../../shared/constants'
-import type { GlobalSettings } from '../../../../shared/global-settings-types'
-import type { ProfileAgent } from '../../../../shared/agent-launch-profile'
-import { createAgentProfileConnectionService } from '../../../../main/agent-profiles/runtime-composition'
+import { getDefaultPersistedState } from '../../src/shared/constants'
+import type { GlobalSettings } from '../../src/shared/global-settings-types'
+import type { ProfileAgent } from '../../src/shared/agent-launch-profile'
+import { createAgentProfileConnectionService } from '../../src/main/agent-profiles/runtime-composition'
 import {
   updateSettings,
   type SettingsMutationOperations
-} from '../../../../main/persistence/applying-settings/settings-update'
+} from '../../src/main/persistence/applying-settings/settings-update'
 import { useAppStore } from '@/store'
 import { registerSettingsAndSidebarIpcBridge } from '@/hooks/ipc-events/settings-sidebar-ipc-bridge'
 import { resolveAgentProfileForWorkspace } from '@/lib/agent-profile-workspace-selection'
-import { QuickLaunchAgentMenuItems } from '../tab-bar/QuickLaunchButton'
-import { AgentLaunchProfiles } from './AgentLaunchProfiles'
+import { QuickLaunchAgentMenuItems } from '../../src/renderer/src/components/tab-bar/QuickLaunchButton'
+import { AgentLaunchProfiles } from '../../src/renderer/src/components/settings/AgentLaunchProfiles'
 const state = vi.hoisted(() => ({ root: '', launch: vi.fn() }))
 vi.mock('electron', () => ({ app: { getPath: () => state.root } }))
-vi.mock('../../../../main/codex-accounts/independent-profile-home', () => ({
+vi.mock('../../src/main/codex-accounts/independent-profile-home', () => ({
   readManagedCodexProfileIdentity: () => ({
     email: 'new@example.test',
     providerAccountId: 'provider',
@@ -32,7 +32,7 @@ vi.mock('@/hooks/useDetectedAgents', () => ({
 }))
 vi.mock('@/hooks/useShortcutLabel', () => ({ useOptionalShortcutLabel: () => null }))
 vi.mock('@/lib/launch-agent-in-new-tab', () => ({ launchAgentInNewTab: state.launch }))
-vi.mock('../ui/dropdown-menu', () => ({
+vi.mock('../../src/renderer/src/components/ui/dropdown-menu', () => ({
   DropdownMenuItem: ({
     children,
     disabled,
@@ -100,7 +100,11 @@ function Surface({ agent }: { agent: ProfileAgent }) {
       <>
         <AgentLaunchProfiles agent={agent} settings={settings} />
         <nav aria-label="Launch menu">
-          <QuickLaunchAgentMenuItems worktreeId="folder:local" onFocusTerminal={() => {}} />
+          <QuickLaunchAgentMenuItems
+            worktreeId="folder:local"
+            groupId="test-group"
+            onFocusTerminal={() => {}}
+          />
         </nav>
       </>
     )

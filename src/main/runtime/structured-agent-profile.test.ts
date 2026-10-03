@@ -7,7 +7,7 @@ import * as adoption from './structured-agent-session-create-adoption'
 import { CodexStructuredSessionAdapter } from '../codex/codex-structured-session-adapter'
 import { fakeCodex } from '../codex/codex-structured-session-adapter-fixture'
 import { OrcaRuntimeWithRestoreStructuredAgentSessionTabsOnce } from './orca-runtime-restore-structured-agent-session-tabs-once'
-import type { RuntimeMobileSessionTabsSnapshot } from './runtime-types'
+import type { RuntimeMobileSessionTabsSnapshot } from '../../shared/runtime-types'
 import { OrcaRuntimeWithGetStructuredAgentSessionCreateSupport } from './orca-runtime-get-structured-agent-session-create-support'
 vi.mock('electron', () => ({
   BrowserWindow: { fromId: vi.fn(() => null) },
