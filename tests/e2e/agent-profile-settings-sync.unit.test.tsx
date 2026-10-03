@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 // Crosses the real host writer, renderer notification bridge and settings-backed UI.
+import { installFakeAppEnvironment } from '../../config/scripts/vitest-host-ports-setup'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -136,12 +137,21 @@ function expectSelectionPreserved() {
 beforeEach(() => {
   vi.clearAllMocks()
   state.root = mkdtempSync(join(tmpdir(), 'profile-ui-sync-'))
+  installFakeAppEnvironment({ getPath: () => state.root })
   const executable = join(state.root, 'cli')
   writeFileSync(executable, 'synthetic')
   chmodSync(executable, 0o700)
   const claudeHome = join(state.root, 'claude-accounts/new/auth')
   mkdirSync(claudeHome, { recursive: true })
   writeFileSync(join(claudeHome, '.orca-managed-claude-auth'), 'new')
+  writeFileSync(
+    join(claudeHome, '.credentials.json'),
+    JSON.stringify({ claudeAiOauth: { accessToken: 'synthetic' } })
+  )
+  writeFileSync(
+    join(claudeHome, 'oauth-account.json'),
+    JSON.stringify({ emailAddress: 'new@example.test' })
+  )
   const codexHome = join(state.root, 'codex-home')
   mkdirSync(codexHome)
   const listeners = new Set<(updates: Partial<GlobalSettings>) => void>()

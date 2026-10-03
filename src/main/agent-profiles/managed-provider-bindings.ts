@@ -1,3 +1,4 @@
+import { AgentProfilePreparationError } from './preparation-error'
 import { reserveCodexProfileAccountOwner } from '../codex/codex-pane-account-registry'
 import { validateManagedCodexProfileLaunch } from '../codex-accounts/profile-launch-preflight'
 // Provider-owned account records and home gates are the only managed binding authority.
@@ -8,7 +9,8 @@ import { resolveOwnedClaudeManagedAuthPath } from '../claude-accounts/managed-au
 import { reserveClaudeCredentialOwner } from '../claude-accounts/live-pty-gate'
 import { CLAUDE_PROFILE_PROVIDER_ENV_VARS } from '../claude-accounts/claude-profile-environment'
 import { readManagedCodexProfileIdentity } from '../codex-accounts/independent-profile-home'
-import type { ProfileIdentity } from '../../shared/agent-launch-profile'
+import { readManagedClaudeProfileIdentity } from '../claude-accounts/profile-identity'
+import { validateManagedClaudeProfileLaunch } from '../claude-accounts/profile-launch-preflight'
 import { createClaudeProfileAdapter, createCodexProfileAdapter } from './provider-adapters'
 
 export type ManagedProfileServices = {
@@ -21,7 +23,7 @@ export type ManagedProfileServices = {
 }
 
 export function createManagedProfileAdapters(services: ManagedProfileServices) {
-  function claudeObservation(accountId: string) {
+  async function claudeObservation(accountId: string) {
     const account = services.store
       .getSettings()
       .claudeManagedAccounts.find((entry) => entry.id === accountId)
@@ -32,18 +34,7 @@ export function createManagedProfileAdapters(services: ManagedProfileServices) {
     if (!home) {
       throw new Error('Managed Claude home is untrusted or unavailable.')
     }
-    const identity: ProfileIdentity =
-      account.authMethod === 'subscription-oauth' && account.email.trim()
-        ? {
-            kind: 'verified',
-            subject: JSON.stringify([
-              'claude',
-              account.email,
-              account.organizationUuid ?? account.organizationName ?? null
-            ]),
-            displayName: account.email
-          }
-        : { kind: 'unverified', reason: 'Managed Claude identity is unknown.' }
+    const identity = await readManagedClaudeProfileIdentity(account)
     return { home, identity }
   }
   function codexObservation(accountId: string) {
@@ -75,18 +66,23 @@ export function createManagedProfileAdapters(services: ManagedProfileServices) {
   }
   return {
     claude: createClaudeProfileAdapter({
-      inspectManaged: async (id) => claudeObservation(id),
+      validateLaunch: validateManagedClaudeProfileLaunch,
+      inspectManaged: claudeObservation,
       prepareManaged: async (id) => {
         const release = reserveClaudeCredentialOwner(true)
         try {
-          const observed = claudeObservation(id)
+          const observed = await claudeObservation(id)
+          if (observed.identity.kind !== 'verified') {
+            throw new AgentProfilePreparationError('claude_identity')
+          }
           const auth = await services.claudeRuntimeAuth.prepareForClaudeProfileLaunch(id, {
             runtime: 'host'
           })
           if (
             !auth.isolatedCredentials ||
             auth.configDir !== observed.home ||
-            JSON.stringify(claudeObservation(id).identity) !== JSON.stringify(observed.identity)
+            JSON.stringify((await claudeObservation(id)).identity) !==
+              JSON.stringify(observed.identity)
           ) {
             throw new Error('Managed Claude preparation did not retain its owned home.')
           }

@@ -346,6 +346,10 @@ export function createClaudeStructuredLaunchResolver(
             [CLAUDE_SESSION_STATE_EVENTS_ENV]: '1'
           })
       )
+      const cwd = await deps.resolveWorkspacePath(record.location.workspaceId)
+      if (prepared) {
+        await deps.agentProfiles!.validateLaunch(prepared, { cwd, env })
+      }
       return {
         ...(prepared ? { release: prepared.release, envToDelete: prepared.envToDelete } : {}),
         pathToClaudeCodeExecutable: command,
@@ -357,7 +361,7 @@ export function createClaudeStructuredLaunchResolver(
           // Claude owns where a resumed conversation continues; the stored leaf is Orca's bookkeeping.
           ...(resumesTranscript ? { resume: providerSessionId } : { sessionId: providerSessionId })
         },
-        cwd: await deps.resolveWorkspacePath(record.location.workspaceId),
+        cwd,
         env,
         claudeConfigDir: record.accountHome.path,
         providerSessionId,

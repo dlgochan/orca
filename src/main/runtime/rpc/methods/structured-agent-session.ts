@@ -20,6 +20,7 @@ import {
   ensureStructuredHostInstalled as ensureHostInstalled,
   requireInstalledStructuredHost as requireInstalledHost,
   requireStructuredCapability,
+  requireStructuredProfileCaller,
   requireStructuredCleanupHost,
   requireStructuredCreateSupportAdmission,
   requireStructuredHost as requireHost,
@@ -134,6 +135,7 @@ export const STRUCTURED_AGENT_SESSION_METHODS = [
     params: CreateSupportParams,
     handler: async (params, ctx) => {
       requireStructuredCreateSupportAdmission(ctx)
+      requireStructuredProfileCaller(ctx, params.agentProfileId)
       const support = await ctx.runtime.getStructuredAgentSessionCreateSupport(
         params.worktree,
         params.agent,
@@ -160,6 +162,7 @@ export const STRUCTURED_AGENT_SESSION_METHODS = [
       // a client can tell "nothing was created" from "the outcome is unknown".
       const prepared = await resolveUncommittedStructuredCreate(async () => {
         if ('worktree' in params) {
+          requireStructuredProfileCaller(ctx, params.agentProfileId)
           const conflict = agentSessionFingerprintConflict(
             params.envelope,
             structuredAgentSessionCreateIntentFingerprint(params)

@@ -503,17 +503,13 @@ describe('method routing', () => {
   )
 
   it.each(['claude', 'codex'])(
-    'probes %s profile capability without catalog resolution',
+    'probes local %s profile capability without catalog resolution',
     async (agent) => {
-      const response = await call(
-        'agentSession.createSupport',
-        {
-          worktree: 'id:workspace-1',
-          agent,
-          agentProfileId: 'unlinked-profile'
-        },
-        STRUCTURED_CLIENT
-      )
+      const response = await call('agentSession.createSupport', {
+        worktree: 'id:workspace-1',
+        agent,
+        agentProfileId: 'unlinked-profile'
+      })
       expect(response).toMatchObject({ ok: true, result: { supported: true } })
       expect(runtimeCalls.getStructuredAgentSessionCreateSupport).toHaveBeenCalledWith(
         'id:workspace-1',

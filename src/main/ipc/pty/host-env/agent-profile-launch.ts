@@ -1,3 +1,4 @@
+import { assertClaudeProfileCli } from '../../../claude-accounts/claude-profile-cli'
 import { CODEX_PROFILE_ROUTING_ENV } from '../../../codex-accounts/profile-launch-authority'
 import { AgentProfilePreparationError } from '../../../agent-profiles/preparation-error'
 // The execution host captures fresh bindings and resumes their immutable snapshot.
@@ -85,6 +86,9 @@ export async function prepareTerminalProfileLaunch(
       CODEX_PROFILE_ROUTING_ENV.some((key) => ({ ...process.env, ...args.env })[key] !== undefined)
     ) {
       throw new AgentProfilePreparationError('codex_config')
+    }
+    if (prepared.snapshot.agent === 'claude' && prepared.snapshot.binding.kind === 'managed') {
+      await assertClaudeProfileCli(prepared.snapshot.executable)
     }
     args.command = pinAgentProfileTerminalCommand(prepared, args.command, args.env)
     args.launchAgent = prepared.snapshot.agent

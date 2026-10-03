@@ -60,3 +60,10 @@ A previous command path is accepted only as a validated argv label and is replac
 
 Structured execution and pending acquisition ownership also guard account deletion after launcher
 unlink. Durable closed history alone does not retain a credential home.
+
+Managed Claude acquisition checks canonical CLI credentials and identity metadata against the account
+before preparation, then checks enabled user/project/local and file-policy settings at the final cwd.
+Competing authentication and observable unverified policy (MDM, cached remote policy, policy helpers)
+refuse managed launch. These sources remain enabled for the CLI; external profiles retain their own
+configuration. Provider startup can fetch or change policy after preflight, so the check is not an
+atomic guarantee over a running session.

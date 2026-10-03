@@ -1,3 +1,4 @@
+import { installFakeAppEnvironment } from '../../../config/scripts/vitest-host-ports-setup'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -49,6 +50,7 @@ function account(id: string) {
 
 describe('canonical isolated Claude credentials', () => {
   beforeEach(() => {
+    installFakeAppEnvironment({ getPath: () => state.userData })
     state.userData = mkdtempSync(join(tmpdir(), 'orca-profile-auth-'))
     state.privateEntries.clear()
     state.scopedEntries.clear()
