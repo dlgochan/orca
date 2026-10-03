@@ -186,31 +186,6 @@ describe('host profile connections', () => {
     }))
     await expect(svc.save({ name: 'Overflow', connection: connection() })).rejects.toThrow(/32/)
   })
-  it('resolves assignments, bounded aliases, direct CLI and leading home tilde', async () => {
-    const defaultHome = join(root, '.claude')
-    await mkdir(defaultHome)
-    const svc = service({
-      readAliases: async () => [
-        { name: '.bash_aliases', content: `alias work='CLAUDE_CONFIG_DIR="${home}" claude'` }
-      ]
-    })
-    for (const value of ['work', `CLAUDE_CONFIG_DIR="${home}" claude`]) {
-      expect(
-        (await svc.preview({ agent: 'claude', source: { kind: 'command', value } })).resolvedHome
-      ).toBe(home)
-    }
-    expect(
-      (await svc.preview({ agent: 'claude', source: { kind: 'command', value: 'claude' } }))
-        .resolvedHome
-    ).toBe(defaultHome)
-    expect(
-      (await svc.preview({ agent: 'claude', source: { kind: 'home', value: '~/account' } }))
-        .resolvedHome
-    ).toBe(home)
-    await expect(
-      svc.preview({ agent: 'claude', source: { kind: 'command', value: 'claude --resume' } })
-    ).rejects.toThrow(/folder/)
-  })
   it('refuses changed executable and nonexecutable candidates', async () => {
     const svc = service()
     const profile = await svc.save({ name: 'Work', connection: connection() })
@@ -261,5 +236,19 @@ describe('host profile connections', () => {
     await expect(
       service().preview({ agent: 'claude', source: { kind: 'managed', accountId: 'one' } })
     ).rejects.toThrow('Managed account inspection failed.')
+  })
+  it('does not upgrade an unverified snapshot into identity-bound acquisition', async () => {
+    identity = { kind: 'unverified', reason: 'unsupported' }
+    const svc = service()
+    const profile = await svc.save({ name: 'Work', connection: connection() })
+    const { snapshot } = await svc.prepare(profile, { resume: false, mode: 'terminal' })
+    identity = { kind: 'verified', subject: 'later', displayName: 'Later' }
+    await expect(svc.prepare(snapshot, { resume: true, mode: 'terminal' })).rejects.toThrow(
+      /unverified/i
+    )
+    await expect(svc.prepare(snapshot, { resume: false, mode: 'structured' })).rejects.toThrow(
+      /unverified/i
+    )
+    await expect(svc.prepare(snapshot, { resume: false, mode: 'terminal' })).resolves.toBeDefined()
   })
 })

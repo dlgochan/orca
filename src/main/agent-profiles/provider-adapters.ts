@@ -20,7 +20,6 @@ export type ManagedProfileCallbacks = {
 export type ProfileProviderAdapter = ManagedProfileCallbacks & {
   agent: ProfileAgent
   homeVariable: string
-  defaultDirectory: string
   authVariables: readonly string[]
 }
 
@@ -31,7 +30,6 @@ export function createClaudeProfileAdapter(
     ...callbacks,
     agent: 'claude',
     homeVariable: 'CLAUDE_CONFIG_DIR',
-    defaultDirectory: '.claude',
     authVariables: [...CLAUDE_AUTH_ENV_VARS, 'ANTHROPIC_CUSTOM_HEADERS']
   }
 }
@@ -42,7 +40,6 @@ export function createCodexProfileAdapter(
     ...callbacks,
     agent: 'codex',
     homeVariable: 'CODEX_HOME',
-    defaultDirectory: '.codex',
     authVariables: ['OPENAI_API_KEY', 'CODEX_API_KEY']
   }
 }

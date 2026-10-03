@@ -21,7 +21,11 @@ self-contained managed-home preparation changes global selection and is unsuitab
 External inspection defaults to unverified. An injected inspector must be read-only, return only
 provider identity metadata, and use fixed provider status arguments through the shared process API
 with a 5-second timeout and 64-KiB output bound. The common service neither reads tokens nor invokes
-provider programs. Unverified identity permits fresh terminal acquisition only.
+provider programs. Command connections require an explicit home assignment; bare CLI names and
+absolute executable paths require folder selection because shell state can override the home.
+Unverified identity permits fresh terminal acquisition only. A snapshot captured without verified
+identity stays ineligible for resume or structured acquisition even if a later observation becomes
+verified.
 
 The launch caller applies `envToDelete` and `envPatch` at actual CLI execution **after shell startup**,
 rejects conflicting explicit authentication overrides, and owns `release` until process creation or

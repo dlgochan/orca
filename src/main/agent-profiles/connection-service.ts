@@ -1,7 +1,7 @@
 // Resolves profile bindings on their execution host without acquiring external credentials.
 import { access, constants, realpath, stat } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
-import { isAbsolute, join } from 'node:path'
+import { isAbsolute } from 'node:path'
 import {
   isAgentLaunchProfile,
   validateAgentLaunchProfileName,
@@ -40,7 +40,7 @@ export class AgentProfileConnectionService {
       throw new Error('Profiles are supported on local macOS/Linux hosts only.')
     }
   }
-  private async executable(agent: ProfileAgent): Promise<string> {
+  private async executable(agent: ProfileAgent): Promise<{ detected: string; canonical: string }> {
     const detected = await (
       this.dependencies.detectExecutable ?? createProfileExecutableDetector(this.dependencies.host)
     )(agent)
@@ -53,7 +53,7 @@ export class AgentProfileConnectionService {
         throw new Error('not a file')
       }
       await access(canonical, constants.X_OK)
-      return canonical
+      return { detected, canonical }
     } catch {
       throw new Error('Detected agent executable is unavailable.')
     }
@@ -71,7 +71,7 @@ export class AgentProfileConnectionService {
     if (!adapter || adapter.agent !== input.agent) {
       throw new Error('Unsupported profile agent.')
     }
-    const executable = await this.executable(input.agent)
+    const { detected, canonical: executable } = await this.executable(input.agent)
     let binding: ProfileBinding
     let resolvedHome: string
     let identity: ProfileIdentity
@@ -91,28 +91,24 @@ export class AgentProfileConnectionService {
       if (input.source.kind === 'command') {
         const context = {
           commandName: input.agent,
-          executable,
+          executable: detected,
           homeVariable: adapter.homeVariable,
           hostHome: host.home,
           platform: host.platform
         }
-        if (path === input.agent || path === executable) {
-          path = join(host.home, adapter.defaultDirectory)
-        } else {
-          const parsed = /^[A-Za-z0-9_.-]{1,128}$/.test(path)
-            ? discoverLiteralProfileAlias(
-                path,
-                await (
-                  this.dependencies.readAliases ?? (() => readConventionalProfileAliases(host))
-                )(),
-                context
-              )
-            : parseProfileCommand(path, context)
-          if (parsed.kind !== 'resolved') {
-            throw new Error('Command cannot be safely resolved. Choose a configuration folder.')
-          }
-          path = parsed.home
+        const parsed = /^[A-Za-z0-9_.-]{1,128}$/.test(path)
+          ? discoverLiteralProfileAlias(
+              path,
+              await (
+                this.dependencies.readAliases ?? (() => readConventionalProfileAliases(host))
+              )(),
+              context
+            )
+          : parseProfileCommand(path, context)
+        if (parsed.kind !== 'resolved') {
+          throw new Error('Command cannot be safely resolved. Choose a configuration folder.')
         }
+        path = parsed.home
       } else if (path.startsWith('~/')) {
         path = host.home + path.slice(1)
       }
@@ -246,7 +242,8 @@ export class AgentProfileConnectionService {
       throw new Error('Profile identity changed or cannot be verified. Reconnect the profile.')
     }
     if (
-      candidate.identity.kind === 'unverified' &&
+      (candidate.identity.kind === 'unverified' ||
+        ('identity' in profile && profile.identity.kind === 'unverified')) &&
       (options.resume || options.mode === 'structured')
     ) {
       throw new Error('Unverified identity supports fresh terminal launch only.')
