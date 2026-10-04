@@ -1,4 +1,5 @@
 // Register a committed process before fallible UI/persistence work can release its pending lease.
+import { isAbsolute, sep } from 'node:path'
 import type { PtySpawnResult } from '../../../providers/types'
 import type { PreparedAgentProfile } from '../../../agent-profiles/connection-service'
 import {
@@ -21,9 +22,10 @@ export async function reserveAgentProfilePtyOwnership(
   if (prepared.snapshot.binding.kind === 'managed') {
     return { ...prepared, claudeCredentialIsolation: true }
   }
-  const runtimeHome = await validateExternalProfileHome(
-    new ClaudeRuntimePathResolver().getRuntimePaths().configDir
-  )
+  const configDir = new ClaudeRuntimePathResolver().getRuntimePaths().configDir
+  // Canonicalization must follow symlinks before interpreting parent segments.
+  const absoluteConfigDir = isAbsolute(configDir) ? configDir : `${process.cwd()}${sep}${configDir}`
+  const runtimeHome = await validateExternalProfileHome(absoluteConfigDir)
   if (!runtimeHome.ok || runtimeHome.home !== prepared.snapshot.resolvedHome) {
     return prepared
   }

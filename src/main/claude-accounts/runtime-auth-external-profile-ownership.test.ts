@@ -13,7 +13,7 @@ import {
 } from './runtime-auth-service-test-harness'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdirSync, readFileSync, symlinkSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, relative, sep } from 'node:path'
 import type * as Os from 'node:os'
 import { isOauthTokenExpiring, refreshClaudeOauthCredentials } from './oauth-refresh'
 import type { PreparedAgentProfile } from '../agent-profiles/connection-service'
@@ -106,7 +106,7 @@ async function runtimeAuth() {
 }
 
 describe('external Claude runtime credential ownership', () => {
-  it.each(['default', 'alias'] as const)(
+  it.each(['default', 'alias', 'relative'] as const)(
     'defers actual legacy auth refresh for a live %s home until exit',
     async (homeKind) => {
       const { service, expired, gate, commitAgentProfilePtyOwnership } = await runtimeAuth()
@@ -115,8 +115,12 @@ describe('external Claude runtime credential ownership', () => {
         const alias = join(testState.fakeHomeDir, 'runtime-alias')
         symlinkSync(home, alias)
         vi.stubEnv('CLAUDE_CONFIG_DIR', alias)
+      } else if (homeKind === 'relative') {
+        vi.stubEnv('CLAUDE_CONFIG_DIR', relative(process.cwd(), home))
       }
       const prepared = await prepareExternal(home)
+      expect((await service.prepareForRateLimitFetch()).managedRefreshDeferredByLivePty).toBe(true)
+      expect(refreshClaudeOauthCredentials).not.toHaveBeenCalled()
       commitAgentProfilePtyOwnership(prepared, { id: 'external-live' })
       prepared.release()
       const preparation = await service.prepareForRateLimitFetch()
@@ -129,6 +133,21 @@ describe('external Claude runtime credential ownership', () => {
       expect(refreshClaudeOauthCredentials).toHaveBeenCalledOnce()
     }
   )
+
+  it('preserves relative symlink-parent directory identity during ownership classification', async () => {
+    const { gate, commitAgentProfilePtyOwnership } = await runtimeAuth()
+    const home = join(testState.fakeHomeDir, '.claude')
+    const child = join(home, 'child')
+    mkdirSync(child)
+    const alias = join(testState.fakeHomeDir, 'runtime-alias')
+    symlinkSync(child, alias)
+    vi.stubEnv('CLAUDE_CONFIG_DIR', `${relative(process.cwd(), alias)}${sep}..`)
+    const prepared = await prepareExternal(home)
+    expect(gate.shouldDeferClaudeRuntimeRefresh()).toBe(true)
+    commitAgentProfilePtyOwnership(prepared, { id: 'external-live' })
+    prepared.release()
+    expect(gate.hasLiveLegacyClaudePtys()).toBe(true)
+  })
 
   it('defers while preparation is pending and wakes refresh when the launch is cancelled', async () => {
     const { service, gate } = await runtimeAuth()
@@ -203,13 +222,22 @@ describe('external Claude runtime credential ownership', () => {
     expect(refreshClaudeOauthCredentials).toHaveBeenCalledOnce()
   })
 
-  it('does not block refresh for an independent external home', async () => {
-    const { service, gate, commitAgentProfilePtyOwnership } = await runtimeAuth()
-    const home = join(testState.fakeHomeDir, 'independent')
-    mkdirSync(home)
-    commitAgentProfilePtyOwnership(await prepareExternal(home), { id: 'external-live' })
-    expect(gate.hasLiveLegacyClaudePtys()).toBe(false)
-    await service.prepareForRateLimitFetch()
-    expect(refreshClaudeOauthCredentials).toHaveBeenCalledOnce()
-  })
+  it.each(['default', 'relative'] as const)(
+    'does not block refresh for an independent external home with %s runtime paths',
+    async (runtimePaths) => {
+      const { service, gate, commitAgentProfilePtyOwnership } = await runtimeAuth()
+      if (runtimePaths === 'relative') {
+        vi.stubEnv(
+          'CLAUDE_CONFIG_DIR',
+          relative(process.cwd(), join(testState.fakeHomeDir, '.claude'))
+        )
+      }
+      const home = join(testState.fakeHomeDir, 'independent')
+      mkdirSync(home)
+      commitAgentProfilePtyOwnership(await prepareExternal(home), { id: 'external-live' })
+      expect(gate.hasLiveLegacyClaudePtys()).toBe(false)
+      await service.prepareForRateLimitFetch()
+      expect(refreshClaudeOauthCredentials).toHaveBeenCalledOnce()
+    }
+  )
 })
