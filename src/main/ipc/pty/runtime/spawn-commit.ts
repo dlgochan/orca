@@ -241,15 +241,8 @@ async function commitReservedRuntimePtySpawn(ctx: RuntimePtySpawnState) {
   if (!ctx.stablePaneOwner) {
     ctx.deps.runtime?.noteTerminalSpawnCommand?.(ctx.result.id, ctx.launchCommand ?? null)
   }
-  if (
-    ctx.isClaudeLaunch &&
-    !ctx.stablePaneOwner &&
-    ctx.agentProfile?.snapshot.binding.kind !== 'external'
-  ) {
-    markClaudePtySpawned(
-      ctx.result.id,
-      Boolean(ctx.agentProfile) || ctx.claudeAuth?.isolatedCredentials
-    )
+  if (ctx.isClaudeLaunch && !ctx.stablePaneOwner && !ctx.agentProfile) {
+    markClaudePtySpawned(ctx.result.id, ctx.claudeAuth?.isolatedCredentials)
   }
   if (args.telemetry && !ctx.stablePaneOwner) {
     recordPtySpawnTelemetry(args.telemetry)

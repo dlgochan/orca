@@ -1,3 +1,7 @@
+import {
+  reserveAgentProfilePtyOwnership,
+  type PreparedTerminalAgentProfile
+} from './agent-profile-ownership'
 import { assertClaudeProfileCli } from '../../../claude-accounts/claude-profile-cli'
 import { CODEX_PROFILE_ROUTING_ENV } from '../../../codex-accounts/profile-launch-authority'
 import { AgentProfilePreparationError } from '../../../agent-profiles/preparation-error'
@@ -5,10 +9,7 @@ import { AgentProfilePreparationError } from '../../../agent-profiles/preparatio
 import { copyAgentProfileSnapshot } from '../../../../shared/agent-launch-profile'
 import type { SleepingAgentLaunchConfig } from '../../../../shared/agent-session-resume'
 import type { TuiAgent } from '../../../../shared/tui-agent'
-import type {
-  AgentProfileConnectionService,
-  PreparedAgentProfile
-} from '../../../agent-profiles/connection-service'
+import type { AgentProfileConnectionService } from '../../../agent-profiles/connection-service'
 import { pinAgentProfileTerminalCommand } from '../../../agent-profiles/terminal-command'
 
 export type TerminalProfileService = Pick<
@@ -36,7 +37,7 @@ export async function prepareTerminalProfileLaunch(
     isWsl: boolean
     cwd?: string
   }
-): Promise<PreparedAgentProfile | undefined> {
+): Promise<PreparedTerminalAgentProfile | undefined> {
   if (context.reattach || !hasTerminalProfileBinding(args)) {
     return undefined
   }
@@ -70,10 +71,11 @@ export async function prepareTerminalProfileLaunch(
     cwd: context.cwd,
     env: { ...process.env, ...args.env }
   }
-  const prepared = snapshot
+  let prepared: PreparedTerminalAgentProfile = snapshot
     ? await context.service.prepare(snapshot, options)
     : await context.service.prepareById(args.agentProfileId!, options)
   try {
+    prepared = await reserveAgentProfilePtyOwnership(prepared)
     if (args.launchAgent && prepared.snapshot.agent !== args.launchAgent) {
       throw new Error('Profile does not match the launch agent.')
     }

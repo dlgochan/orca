@@ -1,4 +1,4 @@
-import type { PreparedAgentProfile } from '../../../agent-profiles/connection-service'
+import type { PreparedTerminalAgentProfile } from '../host-env/agent-profile-ownership'
 import type { IPtyProvider, PtySpawnOptions, PtySpawnResult } from '../../../providers/types'
 import type { CodexPaneHomeRoute } from '../../../codex/codex-pane-account-registry'
 import type { CodexAccountSelectionTarget } from '../../../codex-accounts/runtime-selection'
@@ -22,7 +22,7 @@ import { localProvider } from '../provider/registry'
 
 export type RuntimePtySpawnState = {
   profileAttachOnly?: boolean
-  agentProfile?: PreparedAgentProfile
+  agentProfile?: PreparedTerminalAgentProfile
   releaseClaudeCredentialOwner?: () => void
   deps: PtyRuntimeControllerDeps
   args: RuntimePtySpawnArgs

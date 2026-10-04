@@ -1,18 +1,66 @@
 // Register a committed process before fallible UI/persistence work can release its pending lease.
+import type { PtySpawnResult } from '../../../providers/types'
 import type { PreparedAgentProfile } from '../../../agent-profiles/connection-service'
-import { markClaudePtySpawned } from '../../../claude-accounts/live-pty-gate'
+import {
+  markClaudePtySpawned,
+  reserveClaudeCredentialOwner
+} from '../../../claude-accounts/live-pty-gate'
+import { ClaudeRuntimePathResolver } from '../../../claude-accounts/runtime-paths'
+import { validateExternalProfileHome } from '../../../agent-profile-discovery/existing-home'
 import { recordCodexPaneAccount } from '../../../codex/codex-pane-account-registry'
+export type PreparedTerminalAgentProfile = PreparedAgentProfile & {
+  claudeCredentialIsolation?: boolean
+}
+
+export async function reserveAgentProfilePtyOwnership(
+  prepared: PreparedAgentProfile
+): Promise<PreparedTerminalAgentProfile> {
+  if (prepared.snapshot.agent !== 'claude') {
+    return prepared
+  }
+  if (prepared.snapshot.binding.kind === 'managed') {
+    return { ...prepared, claudeCredentialIsolation: true }
+  }
+  const runtimeHome = await validateExternalProfileHome(
+    new ClaudeRuntimePathResolver().getRuntimePaths().configDir
+  )
+  if (!runtimeHome.ok || runtimeHome.home !== prepared.snapshot.resolvedHome) {
+    return prepared
+  }
+  // Home identity grants a refresh lease, never permission to inspect external credentials.
+  const release = reserveClaudeCredentialOwner(false, { deferRuntimeRefresh: true })
+  return {
+    ...prepared,
+    claudeCredentialIsolation: false,
+    release: () => {
+      try {
+        prepared.release()
+      } finally {
+        release()
+      }
+    }
+  }
+}
+
 export function commitAgentProfilePtyOwnership(
-  prepared: PreparedAgentProfile | undefined,
-  result: { id: string; isReattach?: boolean }
+  prepared: PreparedTerminalAgentProfile | undefined,
+  result: Pick<
+    PtySpawnResult,
+    'id' | 'isReattach' | 'exitedBeforeSpawnReply' | 'agentSessionEnsure'
+  >
 ): void {
-  if (!prepared || result.isReattach) {
+  if (
+    !prepared ||
+    result.isReattach ||
+    result.exitedBeforeSpawnReply ||
+    result.agentSessionEnsure?.disposition === 'adopted'
+  ) {
     return
   }
   const snapshot = prepared.snapshot
   if (snapshot.agent === 'claude') {
-    if (snapshot.binding.kind === 'managed') {
-      markClaudePtySpawned(result.id, true)
+    if (prepared.claudeCredentialIsolation !== undefined) {
+      markClaudePtySpawned(result.id, prepared.claudeCredentialIsolation)
     }
   } else {
     recordCodexPaneAccount(result.id, {
