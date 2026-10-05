@@ -170,6 +170,7 @@ describe.each(['desktop', 'runtime'] as const)('%s profile orchestration', (surf
       cols: 80,
       rows: 24,
       command: 'codex resume session',
+      ...(surface === 'desktop' ? { replacesPtyId: 'old-codex' } : {}),
       launchAgent: 'codex',
       launchConfig: { agentArgs: '', agentEnv: {}, agentProfile: captured }
     })
@@ -196,9 +197,15 @@ describe.each(['desktop', 'runtime'] as const)('%s profile orchestration', (surf
   })
   it('keeps ordinary selected-home preparation', async () => {
     const f = fixture('codex')
-    await launch(surface, f.deps, { cols: 80, rows: 24 })
+    await launch(surface, f.deps, {
+      cols: 80,
+      rows: 24,
+      ...(surface === 'desktop' ? { replacesPtyId: 'old-codex' } : {})
+    })
     expect(f.selected).toHaveBeenCalled()
-    expect(f.resume).toHaveBeenCalled()
+    expect(f.resume).toHaveBeenCalledWith(
+      expect.objectContaining(surface === 'desktop' ? { useSelectedAccount: true } : {})
+    )
     expect(f.service.prepareById).not.toHaveBeenCalled()
   })
   it('refuses contradictory snapshot/ID and provider before managed work', async () => {

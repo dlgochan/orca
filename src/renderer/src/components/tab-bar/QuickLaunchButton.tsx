@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react'
-import { Loader2, Settings as SettingsIcon } from 'lucide-react'
+import { Settings as SettingsIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { DropdownMenuItem, DropdownMenuShortcut } from '@/components/ui/dropdown-menu'
 import { getAgentCatalog, AgentIcon } from '@/lib/agent-catalog'
@@ -8,7 +8,7 @@ import { useAgentDetectionTargetForWorktree } from '@/hooks/useAgentDetectionTar
 import { useDetectedAgents } from '@/hooks/useDetectedAgents'
 import { useOptionalShortcutLabel } from '@/hooks/useShortcutLabel'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
-import { isAgentSessionHandleProvider } from '../../../../shared/agent-session-provider-handle'
+import { newAgentLaunchRequestId } from '@/lib/agent-launch-request-id'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { LaunchSource } from '../../../../shared/telemetry-events'
 import {
@@ -16,12 +16,12 @@ import {
   filterEnabledTuiAgents
 } from '../../../../shared/tui-agent-selection'
 import { translate } from '@/i18n/i18n'
-import { useStructuredAgentLaunchStatus } from '@/lib/structured-agent-session-launch'
 import { AgentProfileMenuItem } from './AgentProfileMenuItem'
 import { profileAccounts } from '../settings/agent-profile-accounts'
 import { isProfileAgent } from '../../../../shared/agent-profile-capabilities'
 import { isPairedWebClientWindow } from '@/lib/desktop-window-chrome'
 import { isLocalAgentProfileHost } from '@/lib/agent-profile-workspace-selection'
+import { newAgentPromptOutcome } from '@/lib/new-agent-prompt-outcome'
 
 export type QuickLaunchAgentMenuItemsProps = {
   worktreeId: string
@@ -42,6 +42,10 @@ export type QuickLaunchAgentMenuItemsProps = {
   launchSource?: LaunchSource
   /** Called after a prompt is queued into the agent, or immediately for argv prompt launches. */
   onPromptDelivered?: () => void
+  /** Given the launch's own delivery result while the prompt is still on its way. */
+  onPromptHandedOff?: (delivered: Promise<unknown>) => void
+  /** Nothing to send: e.g. every note is already on its way, so no agent is started. */
+  disabled?: boolean
 }
 
 function getCatalogEntry(agent: TuiAgent): { id: TuiAgent; label: string } | null {
@@ -108,7 +112,9 @@ function QuickLaunchAgentMenuItemsInner({
   prompt,
   promptDelivery,
   launchSource,
-  onPromptDelivered
+  onPromptDelivered,
+  onPromptHandedOff,
+  disabled = false
 }: QuickLaunchAgentMenuItemsProps): React.JSX.Element | null {
   // Why: resolving only the SSH connectionId here made paired-runtime
   // worktrees fall back to LOCAL detection, listing the client's agents
@@ -125,12 +131,6 @@ function QuickLaunchAgentMenuItemsInner({
   const openSettingsPage = useAppStore((s) => s.openSettingsPage)
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
   const newAgentShortcut = useOptionalShortcutLabel('tab.newAgent')
-  // One hook per structured provider: the launch registry is keyed by agent, and hooks cannot run
-  // inside the agent list's render loop.
-  const structuredLaunchStatusByAgent = {
-    claude: useStructuredAgentLaunchStatus(worktreeId, 'claude'),
-    codex: useStructuredAgentLaunchStatus(worktreeId, 'codex')
-  }
 
   const openAgentSettings = useCallback(() => {
     openSettingsTarget({ pane: 'agents', repoId: null })
@@ -139,10 +139,14 @@ function QuickLaunchAgentMenuItemsInner({
 
   const runLaunch = useCallback(
     (agent: TuiAgent, agentProfileId?: string) => {
+      if (disabled) {
+        return
+      }
       const entry = getCatalogEntry(agent)
       const label = entry?.label ?? agent
       const result = launchAgentInNewTab({
         ...(agentProfileId ? { agentProfileId } : {}),
+        requestId: newAgentLaunchRequestId(),
         agent,
         worktreeId,
         groupId,
@@ -160,6 +164,17 @@ function QuickLaunchAgentMenuItemsInner({
           )
         )
         return
+      }
+      if (onPromptHandedOff && result.promptDeliveryResult) {
+        onPromptHandedOff(
+          newAgentPromptOutcome({
+            prompt: prompt ?? '',
+            ...(result.surface.kind === 'local-agent-session'
+              ? { sessionId: result.surface.sessionId }
+              : {}),
+            delivery: result.promptDeliveryResult
+          })
+        )
       }
       if (result.surface.kind !== 'local-terminal') {
         return
@@ -187,7 +202,17 @@ function QuickLaunchAgentMenuItemsInner({
         toast.message(getLaunchWatchdogTimeoutMessage(label))
       })
     },
-    [worktreeId, groupId, onFocusTerminal, prompt, promptDelivery, launchSource, onPromptDelivered]
+    [
+      worktreeId,
+      groupId,
+      onFocusTerminal,
+      prompt,
+      promptDelivery,
+      launchSource,
+      onPromptDelivered,
+      onPromptHandedOff,
+      disabled
+    ]
   )
 
   const enabledDetectedIds = detectedIds ? filterEnabledTuiAgents(detectedIds, disabledAgents) : []
@@ -211,14 +236,12 @@ function QuickLaunchAgentMenuItemsInner({
       {agents.map((agent) => {
         const entry = getCatalogEntry(agent)
         const label = entry?.label ?? agent
-        const isStructuredLaunchPending =
-          isAgentSessionHandleProvider(agent) && structuredLaunchStatusByAgent[agent] === 'pending'
         const showsDefaultAgentShortcut =
           newAgentShortcut !== null && defaultAgent !== 'blank' && agent === defaultAgent
         return (
           <React.Fragment key={agent}>
             <DropdownMenuItem
-              disabled={isStructuredLaunchPending}
+              disabled={disabled}
               onSelect={() => runLaunch(agent)}
               className="gap-2 rounded-[7px] px-2 py-1.5 text-[12px] leading-5 font-medium"
               title={translate(
@@ -227,11 +250,7 @@ function QuickLaunchAgentMenuItemsInner({
                 { value0: label }
               )}
             >
-              {isStructuredLaunchPending ? (
-                <Loader2 className="size-3.5 shrink-0 animate-spin" aria-hidden="true" />
-              ) : (
-                <AgentIcon agent={agent} size={14} />
-              )}
+              <AgentIcon agent={agent} size={14} />
               <span className="flex-1">{label}</span>
               {showsDefaultAgentShortcut ? (
                 <DropdownMenuShortcut>{newAgentShortcut}</DropdownMenuShortcut>
@@ -257,7 +276,7 @@ function QuickLaunchAgentMenuItemsInner({
                       profile={profile}
                       worktreeId={worktreeId}
                       label={account?.email}
-                      disabled={binding.kind === 'managed' && !account}
+                      disabled={disabled || (binding.kind === 'managed' && !account)}
                       onSelect={() => {
                         try {
                           runLaunch(profile.agent, profile.id)

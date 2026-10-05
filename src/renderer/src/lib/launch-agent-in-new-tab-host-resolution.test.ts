@@ -106,7 +106,12 @@ function worktreeOn(hostId: string, path: string): StoreWorktree {
 
 async function launchOnLinux(): Promise<void> {
   const { launchAgentInNewTab } = await import('./launch-agent-in-new-tab')
-  launchAgentInNewTab({ agent: 'claude-agent-teams', worktreeId: 'wt-1', launchPlatform: 'linux' })
+  launchAgentInNewTab({
+    requestId: 'request-1',
+    agent: 'claude-agent-teams',
+    worktreeId: 'wt-1',
+    launchPlatform: 'linux'
+  })
 }
 
 function queuedCommand(): string {
@@ -164,7 +169,12 @@ describe('launchAgentInNewTab execution host resolution', () => {
       store.settings.experimentalStructuredNativeChat = true
       store.settings.openAgentTabsInChatByDefault = true
       const { launchAgentInNewTab } = await import('./launch-agent-in-new-tab')
-      const result = launchAgentInNewTab({ agent, worktreeId, agentProfileId: 'work' })
+      const result = launchAgentInNewTab({
+        requestId: 'profile-terminal',
+        agent,
+        worktreeId,
+        agentProfileId: 'work'
+      })
       expect(result?.surface.kind).toBe('local-terminal')
       expect(mockCreateTab).toHaveBeenCalledWith(worktreeId, undefined, undefined, {
         launchAgent: agent,
@@ -198,7 +208,12 @@ describe('launchAgentInNewTab execution host resolution', () => {
     store.worktreesByRepo = { 'repo-1': [worktreeOn('ssh:ssh-a', '/srv/repo')] }
     const { launchAgentInNewTab } = await import('./launch-agent-in-new-tab')
     expect(() =>
-      launchAgentInNewTab({ agent: 'claude', worktreeId: 'wt-1', agentProfileId: 'work' })
+      launchAgentInNewTab({
+        requestId: 'profile-refused',
+        agent: 'claude',
+        worktreeId: 'wt-1',
+        agentProfileId: 'work'
+      })
     ).toThrow(/local/)
     expect(mockCreateTab).not.toHaveBeenCalled()
     vi.unstubAllGlobals()

@@ -10,6 +10,7 @@ import type { StructuredAgentSessionCreateParams } from '../../../shared/structu
 
 const mocks = vi.hoisted(() => ({
   call: vi.fn(),
+  seedDraft: vi.fn(),
   refresh: vi.fn()
 }))
 
@@ -38,6 +39,7 @@ vi.mock('@/store', () => ({
   useAppStore: {
     getState: () => ({
       unifiedTabsByWorktree: {},
+      seedNativeChatLaunchDraft: mocks.seedDraft,
       repos: [{ id: 'repo', connectionId: null }],
       worktreesByRepo: {
         repo: ['claude', 'codex'].map((agent) => ({
@@ -107,17 +109,27 @@ describe('a launch that adopts a conversation is its own identity', () => {
         name: 'Original B',
         binding: { kind: 'managed', accountId: 'b' }
       }
-      const first = startStructuredAgentLaunch(worktreeId, agent, { agentProfile: a })
+      const first = startStructuredAgentLaunch(worktreeId, agent, {
+        requestId: 'profile-click-a',
+        agentProfile: a,
+        prompt: 'first draft',
+        promptDelivery: 'draft'
+      })
       expect(getStructuredAgentLaunchStatus(worktreeId, agent, a)).toBe('pending')
       expect(() =>
         startStructuredAgentLaunch(worktreeId, agent, {
+          requestId: 'profile-paired-refusal',
           agentProfile: a,
           executionHostId: 'runtime:server-1'
         })
       ).toThrow(/local terminal/)
       expect(getStructuredAgentLaunchStatus(worktreeId, agent, b)).toBe('idle')
-      const second = startStructuredAgentLaunch(worktreeId, agent, { agentProfile: b })
+      const second = startStructuredAgentLaunch(worktreeId, agent, {
+        requestId: 'profile-click-a',
+        agentProfile: b
+      })
       const joined = startStructuredAgentLaunch(worktreeId, agent, {
+        requestId: 'profile-click-a',
         agentProfile: { ...a, name: 'Renamed' }
       })
       await flushLaunchDispatch()
@@ -130,6 +142,16 @@ describe('a launch that adopts a conversation is its own identity', () => {
         expect.objectContaining({ agentProfileId: 'a' })
       )
       expect(getStructuredAgentLaunchStatus(worktreeId, agent)).toBe('idle')
+      const nextAction = startStructuredAgentLaunch(worktreeId, agent, {
+        requestId: 'new-profile-action',
+        agentProfile: a,
+        prompt: 'next draft',
+        promptDelivery: 'draft'
+      })
+      expect(nextAction.sessionId).not.toBe(first.sessionId)
+      await flushLaunchDispatch()
+      expect(createParams().map((params) => params.agentProfileId)).toEqual(['a', 'b', 'a'])
+      expect(mocks.seedDraft).toHaveBeenCalledTimes(2)
       a.name = 'Changed after click'
       expect(localStorage.getItem('orca:structuredAgentLaunches:v1')).toContain('Original A')
       expect(localStorage.getItem('orca:structuredAgentLaunches:v1')).not.toContain('Renamed')
@@ -170,8 +192,9 @@ describe('a launch that adopts a conversation is its own identity', () => {
     // A joining caller is handed the EXISTING intent and contributes only its prompt, so joining
     // here would silently drop the adoption and open a blank chat instead.
     const worktreeId = 'wt-resume-vs-blank'
-    const blank = startStructuredAgentLaunch(worktreeId, 'codex')
+    const blank = startStructuredAgentLaunch(worktreeId, 'codex', { requestId: 'request-1' })
     const resume = startStructuredAgentLaunch(worktreeId, 'codex', {
+      requestId: 'request-2',
       resumeFrom: { providerSessionId: 'thread-1' }
     })
 
@@ -190,9 +213,10 @@ describe('a launch that adopts a conversation is its own identity', () => {
   it('does not hand a blank launch the resume already pending for the same worktree', async () => {
     const worktreeId = 'wt-blank-vs-resume'
     const resume = startStructuredAgentLaunch(worktreeId, 'codex', {
+      requestId: 'request-3',
       resumeFrom: { providerSessionId: 'thread-1' }
     })
-    const blank = startStructuredAgentLaunch(worktreeId, 'codex')
+    const blank = startStructuredAgentLaunch(worktreeId, 'codex', { requestId: 'request-4' })
 
     await flushLaunchDispatch()
 
@@ -203,9 +227,11 @@ describe('a launch that adopts a conversation is its own identity', () => {
   it('keeps two resumes of different rows apart', async () => {
     const worktreeId = 'wt-two-rows'
     const first = startStructuredAgentLaunch(worktreeId, 'codex', {
+      requestId: 'request-5',
       resumeFrom: { providerSessionId: 'thread-1' }
     })
     const second = startStructuredAgentLaunch(worktreeId, 'codex', {
+      requestId: 'request-6',
       resumeFrom: { providerSessionId: 'thread-2' }
     })
 
@@ -221,8 +247,14 @@ describe('a launch that adopts a conversation is its own identity', () => {
   it('coalesces a duplicate click on the same row', async () => {
     const worktreeId = 'wt-same-row-twice'
     const resumeFrom = { providerSessionId: 'thread-1' }
-    const first = startStructuredAgentLaunch(worktreeId, 'codex', { resumeFrom })
-    const second = startStructuredAgentLaunch(worktreeId, 'codex', { resumeFrom })
+    const first = startStructuredAgentLaunch(worktreeId, 'codex', {
+      requestId: 'request-7',
+      resumeFrom
+    })
+    const second = startStructuredAgentLaunch(worktreeId, 'codex', {
+      requestId: 'request-8',
+      resumeFrom
+    })
 
     await flushLaunchDispatch()
 
@@ -232,8 +264,14 @@ describe('a launch that adopts a conversation is its own identity', () => {
 
   it('keeps the same row apart across worktrees and agents', async () => {
     const resumeFrom = { providerSessionId: 'thread-1' }
-    const here = startStructuredAgentLaunch('wt-here', 'codex', { resumeFrom })
-    const there = startStructuredAgentLaunch('wt-there', 'codex', { resumeFrom })
+    const here = startStructuredAgentLaunch('wt-here', 'codex', {
+      requestId: 'request-9',
+      resumeFrom
+    })
+    const there = startStructuredAgentLaunch('wt-there', 'codex', {
+      requestId: 'request-10',
+      resumeFrom
+    })
 
     await flushLaunchDispatch()
 
@@ -247,6 +285,7 @@ describe('a launch that adopts a conversation is its own identity', () => {
     expect(getStructuredAgentLaunchStatus(worktreeId, 'codex')).toBe('idle')
 
     startStructuredAgentLaunch(worktreeId, 'codex', {
+      requestId: 'request-11',
       resumeFrom: { providerSessionId: 'thread-1' }
     })
 

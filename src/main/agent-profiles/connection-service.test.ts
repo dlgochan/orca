@@ -2,6 +2,7 @@ import { mkdtemp, mkdir, rm, writeFile, chmod, symlink } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { CODEX_PROFILE_ROUTING_ENV } from '../codex-accounts/profile-launch-authority'
 import { AgentProfileConnectionService } from './connection-service'
 import { prepareAgentProfileTerminalCommand } from './terminal-command'
 import { runProcess } from '../../shared/child-process/run-process'
@@ -173,6 +174,47 @@ describe('host profile connections', () => {
       })
       await svc.prepare(profile, { resume: true, mode: 'structured' })
       expect(prepareManaged).toHaveBeenCalledWith('account', expect.anything())
+    }
+  )
+  it.skipIf(process.platform === 'win32')(
+    'composes managed Codex deletions after shell exports while retaining external configuration',
+    async () => {
+      // A synthetic provider ignores Codex argv and reports only its final environment.
+      await writeFile(executable, '#!/bin/sh\n/usr/bin/env\n')
+      const svc = service()
+      const managed = await svc.save({
+        name: 'Managed',
+        connection: { agent: 'codex', source: { kind: 'managed', accountId: 'account' } }
+      })
+      const external = await svc.save({ name: 'External', connection: connection('codex') })
+      for (const profile of [managed, external]) {
+        const prepared = await svc.prepare(profile, { resume: false, mode: 'terminal' })
+        const isManaged = profile.binding.kind === 'managed'
+        expect(prepared.envToDelete).toEqual(
+          isManaged ? ['OPENAI_API_KEY', 'CODEX_API_KEY', ...CODEX_PROFILE_ROUTING_ENV] : []
+        )
+        const { command } = prepareAgentProfileTerminalCommand(prepared, 'codex')
+        const result = await runProcess({
+          program: '/bin/sh',
+          args: [
+            '-c',
+            `export OPENAI_API_KEY=synthetic-openai CODEX_API_KEY=synthetic-codex OPENAI_BASE_URL=https://synthetic.invalid CODEX_HOME=/wrong PROFILE_SENTINEL=keep; ${command}`
+          ]
+        })
+        expect(result.code).toBe(0)
+        const env = result.stdout.split('\n')
+        expect(env).toContain(`CODEX_HOME=${home}`)
+        expect(env).toContain('PROFILE_SENTINEL=keep')
+        for (const entry of [
+          'OPENAI_API_KEY=synthetic-openai',
+          'CODEX_API_KEY=synthetic-codex',
+          'OPENAI_BASE_URL=https://synthetic.invalid'
+        ]) {
+          expect(env.includes(entry)).toBe(!isManaged)
+        }
+        prepared.release()
+      }
+      expect(prepareManaged).toHaveBeenCalledOnce()
     }
   )
   it('revalidates saves and missing homes', async () => {

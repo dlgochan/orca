@@ -11,6 +11,7 @@ import { getCohortAtEmit } from '../../../telemetry/cohort-classifier'
 import { agentKindSchema } from '../../../../shared/telemetry-events'
 import { normalizeNodePtySpawnError } from '../provider/liveness'
 import { resolveStablePaneOwner, spawnForStablePane } from '../pane/stable-owner'
+import { excludeReplacedPaneOwner } from '../pane/pane-owner-replacement'
 import { assertSpawnReplyWasLive } from '../pane/agent-session-owners'
 import { deletePtyOwnership } from '../provider/ownership-state'
 import { ptySizes } from '../delivery/visibility-state'
@@ -24,13 +25,19 @@ export async function executePtyIpcSpawn(ctx: PtyIpcSpawnState): Promise<void> {
       ctx.deps.trustedTerminalHandleEnv.add(ctx.preAllocatedHandle)
     }
     ctx.spawnTiming.mark('options')
-    const stablePaneOwnerCandidate = resolveStablePaneOwner(
-      ctx.deps.runtime,
-      ctx.deps.store,
-      ctx.reservationPaneKey,
-      args.worktreeId,
-      args.connectionId
-    )
+    // Why exclude: the restart's own stop leaves its binding for the bind to swap, not to reattach.
+    const resolveOwner = () =>
+      excludeReplacedPaneOwner(
+        resolveStablePaneOwner(
+          ctx.deps.runtime,
+          ctx.deps.store,
+          ctx.reservationPaneKey,
+          args.worktreeId,
+          args.connectionId
+        ),
+        ctx.replacedPaneOwner
+      )
+    const stablePaneOwnerCandidate = resolveOwner()
     const expectedPtyId =
       stablePaneOwnerCandidate?.ptyId ?? ctx.effectiveSessionAppId ?? ctx.effectiveSessionId
     if (expectedPtyId) {
@@ -57,14 +64,7 @@ export async function executePtyIpcSpawn(ctx: PtyIpcSpawnState): Promise<void> {
           owner: stablePaneOwnerCandidate,
           worktreeId: args.worktreeId,
           connectionId: args.connectionId,
-          resolveOwner: () =>
-            resolveStablePaneOwner(
-              ctx.deps.runtime,
-              ctx.deps.store,
-              ctx.reservationPaneKey,
-              args.worktreeId,
-              args.connectionId
-            )
+          resolveOwner
         })
     ctx.result = stablePaneSpawn.result
     commitAgentProfilePtyOwnership(ctx.agentProfile, ctx.result)
