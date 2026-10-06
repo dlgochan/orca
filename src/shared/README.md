@@ -8,6 +8,7 @@ Defines data and pure logic shared across desktop, runtime and renderer boundari
 - `agent-profile-connection.ts`, `agent-profile-capabilities.ts`: public management DTOs and supported profile actions.
 - `agent-session-resume.ts`, `tui-agent-startup.ts`: terminal startup and recovery contracts.
 - `global-settings-types.ts`: persisted settings schema.
+- `rpc-contract/structured-agent-session-envelope-params.ts`: shared RPC identity, cursor and mutation fence schemas.
 
 Credential storage and enrollment belong to [Claude accounts](../main/claude-accounts/README.md).
 

@@ -15,7 +15,6 @@ import {
   type StructuredAgentSessionResumeSource
 } from '../../../shared/structured-agent-session-create'
 import { resolveStructuredLaunchSeedOptions } from '../../../shared/native-chat-session-option-defaults'
-import { hasRuntimeRpcErrorCode } from '../../../shared/runtime-rpc-error-code'
 import { isDefinitiveAgentSessionCreateRefusal } from '../../../shared/agent-session-definitive-refusal'
 import { readAgentSessionRefusalReference } from '../../../shared/agent-session-wire-refusals'
 import { readAgentSessionErrorRefusal } from '../../../shared/agent-session-write-failure'
@@ -37,7 +36,7 @@ import type { ExecutionHostId } from '../../../shared/execution-host'
 import { createBrowserUuid } from '@/lib/browser-uuid'
 import { askHostCreateSupport } from '@/lib/structured-agent-session-host-admission'
 import {
-  StructuredAgentSessionCreateError,
+  definitiveStructuredAgentSessionCreateErrorCode,
   StructuredAgentSessionCreateRefusalError,
   StructuredAgentSessionCreateUnknownOutcomeError,
   StructuredAgentSessionOwnerUnresolvedError
@@ -90,27 +89,6 @@ function structuredAgentSessionOwnerTarget(
     throw new StructuredAgentSessionOwnerUnresolvedError(worktreeId)
   }
   return { executionHostId, target }
-}
-
-const DEFINITIVE_CREATE_FAILURE_CODES = [
-  'structured_agent_session_unsupported',
-  'method_not_found'
-] as const
-
-function definitiveStructuredAgentSessionCreateErrorCode(error: unknown): string | null {
-  if (error instanceof StructuredAgentSessionCreateError) {
-    // Our own classes already carry the verdict; message sniffing below could only invert it.
-    return error instanceof StructuredAgentSessionCreateRefusalError &&
-      isDefinitiveAgentSessionCreateRefusal(error.code)
-      ? error.code
-      : null
-  }
-  for (const code of DEFINITIVE_CREATE_FAILURE_CODES) {
-    if (hasRuntimeRpcErrorCode(error, code)) {
-      return code
-    }
-  }
-  return null
 }
 
 /** `executionHostId` is the host the launch was routed to; absent, the catalog must name exactly

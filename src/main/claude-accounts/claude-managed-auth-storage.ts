@@ -23,22 +23,16 @@ import {
   writeIsolatedClaudeAccountMetadata
 } from './isolated-account-auth'
 
-export type ClaudeManagedAuthLocation = {
-  managedAuthPath: string
-  managedAuthRuntime: 'host' | 'wsl'
-  wslDistro: string | null
-  wslLinuxAuthPath: string | null
-}
-
-export type ClaudeManagedAuthSnapshot = {
-  credentialsJson: string | null
-  oauthAccountJson: string | null
-}
-
-export type ClaudeManagedAuthTarget = {
-  runtime?: 'host' | 'wsl'
-  wslDistro?: string | null
-}
+import type {
+  ClaudeManagedAuthLocation,
+  ClaudeManagedAuthSnapshot,
+  ClaudeManagedAuthTarget
+} from './claude-managed-auth-storage-types'
+export type {
+  ClaudeManagedAuthLocation,
+  ClaudeManagedAuthSnapshot,
+  ClaudeManagedAuthTarget
+} from './claude-managed-auth-storage-types'
 
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, "'\\''")}'`

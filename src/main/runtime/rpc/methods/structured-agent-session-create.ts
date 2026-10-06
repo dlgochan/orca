@@ -12,7 +12,14 @@
  * in. Both callers run the same two halves, so orchestration gets that guarantee too.
  */
 
-import { refuse } from '../../../../shared/agent-session-wire-refusals'
+import type { z } from 'zod'
+import type { RpcContext } from '../core'
+import type { AttachParams } from './structured-agent-session-schemas'
+import {
+  ensureStructuredHostInstalled as ensureHostInstalled,
+  requireStructuredHost as requireHost
+} from './structured-agent-session-gate'
+import { agentSessionRefusalError, refuse } from '../../../../shared/agent-session-wire-refusals'
 import { computeAgentSessionPayloadFingerprint } from '../../../../shared/agent-session-mutation-envelope'
 import type {
   AgentSessionAttachResult,
@@ -190,4 +197,25 @@ export async function createStructuredAgentSessionForWorktree(args: {
     prepared,
     activate: args.activate
   })
+}
+
+/**
+ * The attach-shaped entries take the location from the client instead of resolving it from a
+ * worktree, so they never reach the worktree-resolving create-support check. Ask the executing
+ * host the same question directly: the answer includes host-measured facts the client cannot see
+ * or forge, such as whether this machine can read a provider child's process start time.
+ */
+export async function resolveClientSuppliedAttach(
+  params: z.infer<typeof AttachParams>,
+  ctx: RpcContext
+) {
+  await ensureHostInstalled(ctx)
+  const host = requireHost(ctx)
+  if (!host.supportsCreate(params.location, params.agent)) {
+    throw agentSessionRefusalError('structured_agent_session_unsupported', {
+      reason: 'hostUnsupported'
+    })
+  }
+  const attachParams: AgentSessionAttachParams = { ...params }
+  return { host, attachParams }
 }

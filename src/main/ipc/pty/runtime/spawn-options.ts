@@ -1,29 +1,17 @@
+import { applyRuntimePtySpawnEnvironment } from './spawn-environment'
 import { prepareRuntimeProfileCommand } from './spawn-profile'
-import { getAppEnvironment } from '../../../../shared/app-environment'
-import { getLegacyOpenCodeEnvKeysToDelete } from '../../../opencode/legacy-shared-config-dir'
 import type { IPtyProvider, PtySpawnResult } from '../../../providers/types'
 import { LocalPtyProvider } from '../../../providers/local-pty-provider'
 import { makePaneKey, isTerminalLeafId } from '../../../../shared/stable-pane-id'
 import { isValidTerminalTabId } from '../../../../shared/terminal-tab-id'
 import { ptySizes } from '../delivery/visibility-state'
 import { shouldSeedPreAttachPtySize } from '../delivery/attached-pty-size'
-import { CODEX_HOME_ENV_KEYS } from '../host-env/codex-home'
-import {
-  mergePtyEnvDeletions,
-  removeCodexHomeDeletionRequests,
-  getInheritedAgentHookEnvKeysToDelete,
-  getInheritedAgentSessionStampEnvKeysToDelete
-} from '../host-env/pi-agent'
-import { promoteAgentTeamsShimPath, deleteRequestedEnvKeys } from '../host-env/path'
+import { promoteAgentTeamsShimPath } from '../host-env/path'
 import {
   routesFreshSpawnsToLocalProvider,
   beginPtySpawnForWorktree
 } from '../host-env/fresh-spawn-routing'
 import { isTuiAgent } from '../../../../shared/tui-agent-config'
-import { CLAUDE_AUTH_ENV_VARS } from '../../../claude-accounts/environment'
-import { CLAUDE_PROFILE_PROVIDER_ENV_VARS } from '../../../claude-accounts/claude-profile-environment'
-import { LEGACY_TERMINAL_SHIM_REMOTE_ENV_KEYS } from '../../../pty/legacy-terminal-shim-dir'
-import { PI_PROCESS_OWNER_ENV_KEYS } from '../../../pty/pi-process-owner-env'
 import { resolveConfiguredTerminalShellArgs } from '../configured-terminal-shell-args'
 import { withCodexTerminalServerIsolationEnv } from '../../../../shared/codex-terminal-server-isolation'
 import { resolveStablePaneOwner } from '../pane/stable-owner'
@@ -48,9 +36,6 @@ export async function buildRuntimePtySpawnOptions(
 
   // Why here: every provider (local, daemon, SSH relay, WSL) spawns from this env.
   ctx.env = withCodexTerminalServerIsolationEnv(ctx.env, ctx.deps.getSettings?.())
-  const authEnvToDelete = ctx.claudeAuth?.stripAuthEnv
-    ? [...CLAUDE_AUTH_ENV_VARS, 'ANTHROPIC_CUSTOM_HEADERS']
-    : undefined
   ctx.spawnOptions = {
     cols: args.cols,
     rows: args.rows,
@@ -74,31 +59,7 @@ export async function buildRuntimePtySpawnOptions(
     ptySpawnCommitReported = true
     args.onPtySpawnCommitted?.()
   }
-  ctx.spawnOptions.envToDelete = mergePtyEnvDeletions(
-    authEnvToDelete,
-    ctx.claudeAuth?.isolatedCredentials ? CLAUDE_PROFILE_PROVIDER_ENV_VARS : [],
-    ctx.agentProfile?.envToDelete ?? [],
-    args.envToDelete ?? [],
-    // Persistent daemons and older SSH hosts must not resurrect a parent Pi's ownership.
-    PI_PROCESS_OWNER_ENV_KEYS,
-    // Why: disable old hosts without removing ORCA_REAL_* while their Windows shim remains on PATH.
-    ctx.isDaemonHostSpawn || args.connectionId ? LEGACY_TERMINAL_SHIM_REMOTE_ENV_KEYS : [],
-    ctx.isDaemonHostSpawn ? getInheritedAgentHookEnvKeysToDelete(ctx.env) : [],
-    // The daemon must judge its own inherited value; main may have a different config.
-    !args.connectionId && !ctx.isDaemonHostSpawn
-      ? getLegacyOpenCodeEnvKeysToDelete(ctx.env, getAppEnvironment().getPath('userData'))
-      : [],
-    // Why: ungated, unlike the agent-hook keys — the local provider and the relay host also spread their own process.env into every spawn.
-    getInheritedAgentSessionStampEnvKeysToDelete(ctx.env),
-    ctx.skipCodexHomeEnv ? CODEX_HOME_ENV_KEYS : [],
-    // Why: the daemon owns a persistent inherited environment that may
-    // differ from main. ORCA_CODEX_HOME asks it to compare/delete the pair.
-    ctx.stripInheritedOrcaCodexHome ? ['ORCA_CODEX_HOME'] : []
-  )
-  if (ctx.codexResumeHomeSelected) {
-    ctx.spawnOptions.envToDelete = removeCodexHomeDeletionRequests(ctx.spawnOptions.envToDelete)
-  }
-  deleteRequestedEnvKeys(ctx.env, ctx.spawnOptions.envToDelete)
+  applyRuntimePtySpawnEnvironment(ctx)
   await prepareAntigravityAccountForLaunch({
     launchAgent: args.launchAgent,
     command: ctx.launchCommand,

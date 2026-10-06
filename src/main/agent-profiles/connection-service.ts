@@ -5,7 +5,12 @@ import {
   type AgentProfileSaveInput
 } from '../../shared/agent-profile-connection'
 import { validateResolvedProfileSnapshot } from './snapshot-resolution'
-import { validatePreparedProfileLaunch, type ProfileLaunchContext } from './launch-authority'
+import {
+  validatePreparedProfileLaunch,
+  profileIdentityMetadata,
+  inspectExternalProfileIdentity,
+  type ProfileLaunchContext
+} from './launch-authority'
 import { sanitizedProfilePreparationError } from './preparation-error'
 // Resolves profile bindings on their execution host without acquiring external credentials.
 import { randomUUID } from 'node:crypto'
@@ -90,7 +95,7 @@ export class AgentProfileConnectionService {
           throw sanitizedProfilePreparationError(error, 'Managed account inspection failed.')
         })
       resolvedHome = await this.home(observed.home)
-      identity = this.identityMetadata(observed.identity)
+      identity = profileIdentityMetadata(observed.identity)
       binding = { kind: 'managed', accountId: input.source.accountId }
     } else {
       const host = this.dependencies.host
@@ -126,7 +131,12 @@ export class AgentProfileConnectionService {
       }
       resolvedHome = await this.home(path)
       binding = { kind: 'external', home: resolvedHome }
-      identity = await this.externalIdentity(input.agent, executable, resolvedHome)
+      identity = await inspectExternalProfileIdentity(
+        this.dependencies,
+        input.agent,
+        executable,
+        resolvedHome
+      )
     }
     return {
       agent: input.agent,
@@ -135,28 +145,6 @@ export class AgentProfileConnectionService {
       binding,
       resolvedHome,
       identity
-    }
-  }
-  private identityMetadata(identity: ProfileIdentity): ProfileIdentity {
-    return identity.kind === 'verified'
-      ? { kind: 'verified', subject: identity.subject, displayName: identity.displayName }
-      : { kind: 'unverified', reason: identity.reason }
-  }
-  private async externalIdentity(
-    agent: ProfileAgent,
-    executable: string,
-    home: string
-  ): Promise<ProfileIdentity> {
-    if (!this.dependencies.inspectExternal) {
-      return {
-        kind: 'unverified',
-        reason: 'Provider read-only identity inspection is unavailable.'
-      }
-    }
-    try {
-      return this.identityMetadata(await this.dependencies.inspectExternal(agent, executable, home))
-    } catch {
-      throw new Error('Provider identity inspection failed. Reconnect the configuration folder.')
     }
   }
   private serialize<T>(operation: () => Promise<T>): Promise<T> {

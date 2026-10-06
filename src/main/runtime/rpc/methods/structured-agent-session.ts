@@ -26,8 +26,8 @@ import {
   requireStructuredHost as requireHost,
   structuredCallerFor as callerFor
 } from './structured-agent-session-gate'
-import type { AgentSessionAttachParams } from '../../../native-chat/agent-session-wire/structured-agent-session-attach'
 import {
+  resolveClientSuppliedAttach,
   commitStructuredAgentSessionCreate,
   prepareStructuredAgentSessionCreateForWorktree,
   structuredAgentSessionCreateIntentFingerprint
@@ -67,29 +67,6 @@ import {
   UnsubscribeParams
 } from './structured-agent-session-schemas'
 import { sendStructuredAgentSessionForClient } from './structured-agent-session-send-compatibility'
-
-/**
- * The attach-shaped entries take the location from the client instead of resolving it from a
- * worktree, so they never reach the worktree-resolving create-support check. Ask the executing
- * host the same question directly: the answer includes host-measured facts the client cannot see
- * or forge, such as whether this machine can read a provider child's process start time.
- */
-async function resolveClientSuppliedAttach(params: z.infer<typeof AttachParams>, ctx: RpcContext) {
-  await ensureHostInstalled(ctx)
-  const host = requireHost(ctx)
-  if (!host.supportsCreate(params.location, params.agent)) {
-    throw agentSessionRefusalError('structured_agent_session_unsupported', {
-      reason: 'hostUnsupported'
-    })
-  }
-  const { agent: _attachAgent, provider: _attachProvider, ...attachWithoutAgent } = params
-  const attachParams = {
-    ...attachWithoutAgent,
-    provider: params.provider as 'claude' | 'codex',
-    agent: params.agent as 'claude' | 'codex'
-  } as AgentSessionAttachParams
-  return { host, attachParams }
-}
 
 async function attachClientSuppliedLocation(
   params: z.infer<typeof AttachParams>,
