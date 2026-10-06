@@ -178,7 +178,7 @@ export const STRUCTURED_AGENT_SESSION_METHODS = [
             },
             envelope: params.envelope,
             worktree: params.worktree,
-            agent: params.agent as 'claude' | 'codex',
+            agent: params.agent,
             caller: callerFor(ctx),
             resumeFrom: params.resumeFrom,
             agentProfileId: params.agentProfileId,

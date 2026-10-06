@@ -12,7 +12,10 @@ import type {
 } from '@/lib/structured-agent-launch-settlement'
 import { useAppStore } from '@/store'
 import type { ExecutionHostId } from '../../../shared/execution-host'
-import { isAgentSessionHandleProvider } from '../../../shared/agent-session-provider-handle'
+import {
+  isAgentSessionHandleProvider,
+  type AgentSessionHandleProvider
+} from '../../../shared/agent-session-provider-handle'
 import {
   beginPairedStructuredLaunch,
   openDeclinedStructuredLaunchTerminal,
@@ -38,7 +41,7 @@ export function openStructuredAgentSessionProvisionalTab(args: {
   /** The host the chat is created on; every later operation on the tab reads it. */
   executionHostId: ExecutionHostId
   sessionId: string
-  agent: 'claude' | 'codex'
+  agent: AgentSessionHandleProvider
   profileName?: string
   targetGroupId?: string
   activate?: boolean
@@ -172,7 +175,7 @@ function beginLocalProvisionalLaunch(args: ProvisionalLaunchArgs): LocalProvisio
   if (!handle) {
     return null
   }
-  if (!worktreeId || (args.plan.agent !== 'claude' && args.plan.agent !== 'codex')) {
+  if (!worktreeId || !isAgentSessionHandleProvider(args.plan.agent)) {
     throw new Error('A provisional structured launch needs its workspace and provider.')
   }
   try {

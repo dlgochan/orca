@@ -1,14 +1,9 @@
-import type {
-  CodexEnvironmentHomeOverride,
-  CodexShellStartupHomeOverride
-} from './codex-real-home-path'
-
 export type CodexPaneHomeRoute =
   | 'real-home'
   | 'shared-home'
   | 'account-home'
-  | 'custom-home'
   | 'wsl-home'
+  | 'external-profile-home'
 
 export type CodexPaneAccountRecord = {
   profileBound?: true
@@ -18,10 +13,6 @@ export type CodexPaneAccountRecord = {
   accountId: string | null
   /** Absent only on records written before route provenance was introduced. */
   homeRoute?: CodexPaneHomeRoute
-  /** Rechecked when CODEX_HOME came from process-global shell startup. */
-  shellStartupHomeOverride?: CodexShellStartupHomeOverride
-  /** Rechecked after restart when CODEX_HOME came from the process environment. */
-  environmentHomeOverride?: CodexEnvironmentHomeOverride
 }
 
 export type CodexPaneAccountRegistryFile = {

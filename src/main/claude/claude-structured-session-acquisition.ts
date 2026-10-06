@@ -42,7 +42,7 @@ import {
   reserveClaudeAcquisitionPreparation,
   assertClaudeAcquisitionAuthReady
 } from './claude-structured-acquisition-launch'
-import { agentModelCatalogSessionAccess } from '../native-chat/agent-model-catalog/agent-model-catalog-fingerprint'
+import { claudeAcquireCatalogAccess } from './claude-structured-acquire-catalog'
 import {
   bindClaudeConnectionJournalControls,
   createClaudeJournalFailureHandler
@@ -150,12 +150,9 @@ export async function acquireClaudeSession({
       settle()
     }
   }
-  const { canUseTool, onUserDialog } = buildClaudePermissionCallbacks({
-    sessionId,
-    prompts,
-    emit: (event) =>
-      callbacks.deliver(attempt, sessionId, () => callbacks.emit(liveSession, input.events, event))
-  })
+  const emit = (event: Parameters<typeof callbacks.emit>[2]): void =>
+    callbacks.deliver(attempt, sessionId, () => callbacks.emit(liveSession, input.events, event))
+  const { canUseTool, onUserDialog } = buildClaudePermissionCallbacks({ sessionId, prompts, emit })
 
   const preparation = reserveClaudeAcquisitionPreparation(deps, sessionId)
   try {
@@ -182,7 +179,11 @@ export async function acquireClaudeSession({
           childEnded ??= error
           initProof.reject(error)
         },
-        onExit: (error) => {
+        onExit: (error, exit) => {
+          if (exit?.expected) {
+            callbacks.finishClose(sessionId, attempt)
+            return
+          }
           // The child exited on its own; marked in place, as the fault report may hold this error.
           withObservedProviderExit(error)
           childEnded ??= error
@@ -199,8 +200,6 @@ export async function acquireClaudeSession({
       deps.now ? { now: deps.now } : {}
     )
     acquisitions.assertCurrent(sessionId, attempt)
-    const emit = (event: Parameters<typeof callbacks.emit>[2]): void =>
-      callbacks.deliver(attempt, sessionId, () => callbacks.emit(liveSession, input.events, event))
     if (connection.pid === undefined) {
       // A pid-less spawn always reports its error next; surface that, not the missing pid.
       await initProof.promise
@@ -238,11 +237,7 @@ export async function acquireClaudeSession({
     })
     const session = publication.session
     liveSession = session
-    const catalogAccess = agentModelCatalogSessionAccess(
-      deps.modelCatalog,
-      'claude',
-      launch.claudeConfigDir
-    )
+    const catalogAccess = claudeAcquireCatalogAccess(deps.modelCatalog, launch.claudeConfigDir)
     if (catalogAccess) {
       session.catalogAccess = catalogAccess
     }

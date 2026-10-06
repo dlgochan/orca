@@ -1,6 +1,7 @@
 import { claudeConfigDirEnvPatch } from './claude-config-dir-pin'
 import { CLAUDE_SPAWN_TOKEN_ENV } from './claude-structured-owner-identity'
 import type { ClaudeStreamJsonLaunch } from './claude-stream-json-connection'
+import { claudeProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
 import {
   AgentSessionAcquisitionExitUnprovenError,
   AgentSessionPreSpawnError,
@@ -88,11 +89,10 @@ export async function resolveClaudeAcquisitionLaunch(args: {
     const launchIdentity = resumeSession
       ? {
           ...input.identity,
-          providerHandle: {
-            kind: 'claude' as const,
-            sessionId: resumeSession.providerSessionId,
-            leafUuid: resumeSession.turnEndLeafUuid
-          }
+          providerHandle: claudeProviderHandle(
+            resumeSession.providerSessionId,
+            resumeSession.turnEndLeafUuid
+          )
         }
       : input.identity
     const launch = await deps

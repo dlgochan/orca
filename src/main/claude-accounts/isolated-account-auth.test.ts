@@ -144,6 +144,37 @@ describe('canonical isolated Claude credentials', () => {
     expect(await readClaudeAccountCredentials(a, 'darwin')).toBe('rotated-by-cli')
   })
 
+  it.each(['darwin', 'linux'] as const)(
+    'keeps isolated live grants across write and rollback on %s',
+    async (platform) => {
+      const previousPlatform = process.platform
+      Object.defineProperty(process, 'platform', { value: platform, configurable: true })
+      try {
+        const a = account('a')
+        const oauth = { claudeAiOauth: { accessToken: 'synthetic' } }
+        const legacy = JSON.stringify({ ...oauth, mcpOAuth: { oldSharedGrant: 'old' } })
+        state.privateEntries.set('a', legacy)
+        writeFileSync(join(a.managedAuthPath, '.credentials.json'), legacy)
+        await enrollIsolatedClaudeAccount(a, { oauthAccount: null }, platform)
+        expect(JSON.parse((await readClaudeAccountCredentials(a, platform))!)).toEqual(oauth)
+        const storage = new ClaudeManagedAuthStorage()
+        const own = JSON.stringify({
+          ...oauth,
+          mcpOAuth: { own: 'grant' },
+          pluginSecrets: { own: 'secret' }
+        })
+        await storage.writeCredentials('a', a.managedAuthPath, own)
+        const snapshot = await storage.readSnapshot('a', a.managedAuthPath)
+        expect(snapshot.credentialsJson).toBe(own)
+        await storage.writeCredentials('a', a.managedAuthPath, JSON.stringify(oauth))
+        await storage.restoreCredentials('a', a.managedAuthPath, snapshot)
+        expect(await readClaudeAccountCredentials(a, platform)).toBe(own)
+      } finally {
+        Object.defineProperty(process, 'platform', { value: previousPlatform, configurable: true })
+      }
+    }
+  )
+
   it('rolls back canonical credentials and CLI identity after failed reauthentication', async () => {
     const a = account('a')
     writeFileSync(join(a.managedAuthPath, '.credentials.json'), 'original')

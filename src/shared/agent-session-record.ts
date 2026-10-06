@@ -26,10 +26,13 @@ import {
   type AgentSessionConversationCommandRecord
 } from './agent-session-conversation-command'
 import {
-  isAgentSessionProviderHandleChain,
-  type AgentSessionHandleProvider,
+  decodePersistedAgentSessionProviderHandleChain,
   type AgentSessionProviderHandleLink
 } from './agent-session-provider-handle'
+import {
+  isAgentSessionProviderHandleInNamespace,
+  isStructuredAgentId
+} from './agent-session-provider-handle-encoding'
 
 export const AGENT_SESSION_RECORD_SCHEMA_VERSION = 2 as const
 
@@ -132,7 +135,8 @@ export type AgentSessionRecord = {
   schemaVersion: typeof AGENT_SESSION_RECORD_SCHEMA_VERSION
   sessionId: string
   location: AgentSessionExecutionLocation
-  provider: AgentSessionHandleProvider
+  /** The agent this session names, whether this build can run it or not. */
+  provider: string
   providerHandleChain: AgentSessionProviderHandleLink[]
   accountHome: AgentSessionAccountHome
   /** Provider options the user chose, replayed whenever a new owner starts the session. */
@@ -155,6 +159,8 @@ export type AgentSessionOptionsReplacement = {
 }
 
 const MAX_ID_LENGTH = 512
+/** A death evidence's `detail` past this fails a load, so whoever writes one cuts it here. */
+export const MAX_AGENT_SESSION_DEATH_DETAIL_CHARS = MAX_ID_LENGTH
 const MAX_LAUNCH_ENV_ENTRIES = 256
 const MAX_LAUNCH_ENV_VALUE_LENGTH = 65_536
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/
@@ -276,7 +282,7 @@ function isAgentSessionDeathEvidence(value: unknown): value is AgentSessionDeath
     (evidence.kind === 'exit-observed' ||
       evidence.kind === 'pid-absent' ||
       evidence.kind === 'identity-mismatch') &&
-    isBoundedString(evidence.detail, MAX_ID_LENGTH) &&
+    isBoundedString(evidence.detail, MAX_AGENT_SESSION_DEATH_DETAIL_CHARS) &&
     typeof observedAt === 'number' &&
     Number.isSafeInteger(observedAt) &&
     observedAt >= 0 &&
@@ -319,8 +325,7 @@ function isPersistedAgentSessionLease(value: unknown): value is PersistedAgentSe
   )
 }
 
-/** The on-disk shape, which still admits the removed terminal handoff's lease values. Decode
- *  through `normalizeLegacyHandoffRecord` before anything reads the lease. */
+/** Stored identity is independent of registrations; availability is checked only at start. */
 export function isPersistedAgentSessionRecord(
   value: unknown
 ): value is PersistedAgentSessionRecord {
@@ -332,8 +337,7 @@ export function isPersistedAgentSessionRecord(
     record.schemaVersion === AGENT_SESSION_RECORD_SCHEMA_VERSION &&
     isAgentSessionId(record.sessionId) &&
     isAgentSessionExecutionLocation(record.location) &&
-    (record.provider === 'claude' || record.provider === 'codex') &&
-    isAgentSessionProviderHandleChain(record.providerHandleChain) &&
+    isStructuredAgentId(record.provider) &&
     isAgentSessionAccountHome(record.accountHome) &&
     (record.options === undefined || isAgentSessionOptions(record.options)) &&
     (record.rewind === undefined || isAgentSessionRewindRecord(record.rewind)) &&
@@ -351,13 +355,22 @@ export function isPersistedAgentSessionRecord(
     return false
   }
   const validated = record as AgentSessionRecord
-  const head = validated.providerHandleChain.at(-1)
+  // The row holds stored handles; validate the chain they decode to.
+  const chain = decodePersistedAgentSessionProviderHandleChain(validated.providerHandleChain)
+  const head = chain?.at(-1)
+  // One namespace, owned by the record's own agent; which transport is the chain's own fact.
+  const transport = chain?.[0]?.handle.transport
+  const namespace = transport === undefined ? null : { transport, agent: validated.provider }
   return (
     (!validated.accountHome.agentProfile ||
       (validated.accountHome.agentProfile.agent === validated.provider &&
         validated.accountHome.agentProfile.hostId === validated.location.executionHostId &&
         validated.location.wslDistro === null)) &&
-    validated.providerHandleChain.every((link) => link.handle.provider === validated.provider) &&
+    chain !== null &&
+    chain.every(
+      (link) =>
+        namespace !== null && isAgentSessionProviderHandleInNamespace(link.handle, namespace)
+    ) &&
     (validated.lease.claimStatus !== 'live' ||
       (validated.lease.ownerProcess !== null &&
         head?.linkId === validated.lease.provenHandleLinkId &&

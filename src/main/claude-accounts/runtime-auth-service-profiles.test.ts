@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { join } from 'node:path'
 import type * as os from 'node:os'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import {
   cleanupRuntimeAuthTestState,
   createClaudeAccount,
@@ -63,6 +63,25 @@ describe('profile-bound Claude preparation', () => {
     expect(readFileSync(join(paths[0], '.credentials.json'), 'utf8')).toContain('a@example.com')
     store.updateSettings({ activeClaudeManagedAccountId: 'a' })
     expect((await service.prepareForRateLimitFetch()).managedRefreshDeferredByLivePty).toBe(true)
+  })
+
+  it('keeps enrolled connector grants local when switching back to the shared account lane', async () => {
+    const credentials = createClaudeCredentialsJson('a@example.com', 'a')
+    const path = createManagedClaudeAuth(testState.userDataDir, 'a', credentials)
+    const settings = createSettings({ claudeManagedAccounts: [createClaudeAccount('a', path)] })
+    const store = createStore(settings)
+    const { ClaudeRuntimeAuthService } = await import('./runtime-auth-service')
+    const service = new ClaudeRuntimeAuthService(store)
+    await service.prepareForClaudeProfileLaunch('a')
+    const own = JSON.stringify({ ...JSON.parse(credentials), mcpOAuth: { own: 'grant' } })
+    writeFileSync(join(path, '.credentials.json'), own)
+    store.updateSettings({ activeClaudeManagedAccountId: 'a' })
+    await service.syncForCurrentSelection()
+    store.updateSettings({ activeClaudeManagedAccountId: null })
+    await service.syncForCurrentSelection()
+    expect(readFileSync(join(path, '.credentials.json'), 'utf8')).toBe(own)
+    const shared = join(testState.fakeHomeDir, '.claude', '.credentials.json')
+    expect(existsSync(shared) ? readFileSync(shared, 'utf8') : '').not.toContain('grant')
   })
 
   it('refuses a deleted account instead of using the selected account', async () => {

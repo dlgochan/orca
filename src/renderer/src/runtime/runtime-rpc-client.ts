@@ -1,4 +1,5 @@
 import { assertTerminalProfilesStayLocal } from '../../../shared/terminal-profile-routing'
+import { waitForPromiseWithSignal } from '../../../shared/abort-signal-reason'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import type { RuntimeStatus } from '../../../shared/runtime-types'
 import type { RuntimeCapability } from '../../../shared/protocol-version'
@@ -6,7 +7,7 @@ import { withBrowserPaneUiRuntimeRpcSource } from '../../../shared/runtime-rpc-f
 import { assertRuntimeStatusCompatible } from './runtime-protocol-compat'
 import { createRuntimeRpcAbortError } from './abortable-runtime-environment-call'
 import { callRuntimeEnvironmentWithRevision } from './runtime-rpc-environment-call'
-import { RuntimeRpcCallError, unwrapRuntimeRpcResult } from './runtime-rpc-result'
+import { unwrapRuntimeRpcResult } from './runtime-rpc-result'
 import { captureRuntimeEnvironmentRequestRevision } from './runtime-environment-revision'
 import type { RuntimeClientTarget } from './runtime-client-target'
 
@@ -37,13 +38,6 @@ type RuntimeCompatibilityCacheEntry = {
 
 const runtimeCompatibilityChecks = new Map<string, RuntimeCompatibilityCacheEntry>()
 
-// Why: mobile-scope device tokens are denied non-allowlisted runtime methods
-// with code 'forbidden'. Callers use this to surface one scope-mismatch banner
-// instead of silently swallowing the failure into empty/retry-looping UI.
-export function isRuntimeScopeForbiddenError(error: unknown): boolean {
-  return error instanceof RuntimeRpcCallError && error.code === 'forbidden'
-}
-
 export async function callRuntimeRpc<TResult>(
   target: RuntimeClientTarget,
   method: string,
@@ -61,6 +55,9 @@ export async function callRuntimeRpc<TResult>(
   if (target.kind === 'environment') {
     assertTerminalProfilesStayLocal(params)
   }
+  if (options.signal?.aborted) {
+    throw createRuntimeRpcAbortError()
+  }
   const expectedEnvironmentPairingRevision =
     target.kind === 'environment'
       ? captureRuntimeEnvironmentRequestRevision(
@@ -73,10 +70,13 @@ export async function callRuntimeRpc<TResult>(
     method !== 'status.get' &&
     options.skipCompatibilityCheck !== true
   ) {
-    await ensureRuntimeEnvironmentCompatible(target.environmentId, {
-      ...options,
-      expectedEnvironmentPairingRevision
-    })
+    await waitForPromiseWithSignal(
+      ensureRuntimeEnvironmentCompatible(target.environmentId, {
+        ...options,
+        expectedEnvironmentPairingRevision
+      }),
+      options.signal
+    )
   }
   if (options.signal?.aborted) {
     throw createRuntimeRpcAbortError()

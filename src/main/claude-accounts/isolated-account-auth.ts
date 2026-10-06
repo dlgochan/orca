@@ -1,6 +1,7 @@
 // Enrolled accounts share the CLI's canonical credential instead of rotating a private copy.
 import { lstatSync } from 'node:fs'
 import { join } from 'node:path'
+import { stripSharedClaudeCredentialFields } from './shared-credential-fields'
 import {
   readActiveClaudeKeychainCredentialsStrict,
   readManagedClaudeKeychainCredentials,
@@ -96,8 +97,12 @@ export async function enrollIsolatedClaudeAccount(
     return
   }
   writeIsolatedClaudeAccountMetadata(owned.managedAuthPath, metadata.oauthAccount)
+  // A legacy snapshot's connector grants belong to the shared runtime, not the new live home.
+  const isolatedCredentials = stripSharedClaudeCredentialFields(credentials)
   if (platform === 'darwin') {
-    await writeActiveClaudeKeychainCredentials(credentials, owned.managedAuthPath)
+    await writeActiveClaudeKeychainCredentials(isolatedCredentials, owned.managedAuthPath)
+  } else if (isolatedCredentials !== credentials) {
+    writeClaudeManagedAuthFile(owned.managedAuthPath, '.credentials.json', isolatedCredentials)
   }
   // Commit authority last; a failed scoped write must leave the private credential authoritative.
   writeClaudeManagedAuthFile(owned.managedAuthPath, ISOLATED_MARKER, '1\n')

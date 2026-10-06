@@ -1,3 +1,4 @@
+import { claudeProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
 import { prepareTerminalProfileLaunch } from '../ipc/pty/host-env/agent-profile-launch'
 import { enrollIsolatedClaudeAccount } from '../claude-accounts/isolated-account-auth'
 import { createClaudeStructuredLaunchResolver } from '../claude/claude-structured-launch-resolution'
@@ -294,11 +295,7 @@ it('checks effective authority at structured acquisition and releases its lease 
     workspaceId: record.location.workspaceId,
     hostId: 'local',
     agent: 'claude' as const,
-    providerHandle: {
-      kind: 'claude' as const,
-      sessionId: 'provider-session-alpha-1',
-      leafUuid: null
-    }
+    providerHandle: claudeProviderHandle('provider-session-alpha-1', null)
   }
   const launch = await resolve({ identity })
   launch.release!()

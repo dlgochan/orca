@@ -53,7 +53,7 @@ const location = {
 }
 const identity: AgentSessionJournalIdentity = {
   sessionId: 'session_1',
-  providerHandle: { kind: 'opaque', agent: 'claude', value: 'new' },
+  providerHandle: null,
   workspaceId: location.workspaceId,
   hostId: 'local',
   agent: 'claude'

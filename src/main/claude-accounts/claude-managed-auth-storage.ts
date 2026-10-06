@@ -3,6 +3,7 @@ import { join, relative, resolve, sep } from 'node:path'
 import { parseWslUncPath } from '../../shared/wsl-paths'
 import { toWindowsWslPath } from '../wsl'
 import { runWslProcess } from '../wsl/wsl-runner'
+import { stripSharedClaudeCredentialFields } from './shared-credential-fields'
 import {
   getClaudeManagedAccountsRoot,
   readClaudeManagedAuthFile,
@@ -82,6 +83,10 @@ export class ClaudeManagedAuthStorage {
   ): Promise<void> {
     const trustedPath = await this.assertOwned(managedAuthPath, accountId)
     if (!parseWslUncPath(trustedPath)) {
+      // Legacy snapshots exclude shared grants; an enrolled home owns its live connector state.
+      if (!hasIsolatedClaudeAccountAuth(trustedPath)) {
+        credentialsJson = stripSharedClaudeCredentialFields(credentialsJson)
+      }
       await writeClaudeAccountCredentials(
         { accountId, managedAuthPath: trustedPath },
         credentialsJson

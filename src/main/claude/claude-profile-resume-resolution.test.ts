@@ -1,3 +1,4 @@
+import { claudeProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
 import { describe, expect, it, vi } from 'vitest'
 import { agentSessionRecordFixture } from '../../shared/agent-session-record.test-fixture'
 import type { AgentSessionJournalIdentity } from '../../shared/agent-session-journal-types'
@@ -29,7 +30,7 @@ describe('isolated account ownership on structured resume', () => {
         workspaceId: record.location.workspaceId,
         hostId: 'local',
         agent: 'claude',
-        providerHandle: { kind: 'claude', sessionId: 'provider-session-alpha-1', leafUuid: null }
+        providerHandle: claudeProviderHandle('provider-session-alpha-1', null)
       }
       if (bound) {
         await expect(resolve({ identity })).resolves.toMatchObject({

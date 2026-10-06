@@ -68,7 +68,7 @@ export function commitAgentProfilePtyOwnership(
     recordCodexPaneAccount(result.id, {
       selectionKey: 'host',
       accountId: snapshot.binding.kind === 'managed' ? snapshot.binding.accountId : null,
-      homeRoute: snapshot.binding.kind === 'managed' ? 'account-home' : 'custom-home',
+      homeRoute: snapshot.binding.kind === 'managed' ? 'account-home' : 'external-profile-home',
       profileBound: true
     })
   }

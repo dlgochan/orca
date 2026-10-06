@@ -1,6 +1,7 @@
 // @ts-nocheck -- mechanically split from OrcaRuntimeService; behavior is covered by AST equivalence and characterization tests.
 import type { AgentProfileConnectionService } from '../agent-profiles/connection-service'
 import { OrcaRuntimeWithLinearCommands } from './orca-runtime-linear-commands'
+import type { ExecutionHostScope } from '../../shared/execution-host'
 import type { RuntimeStore } from './runtime-store-contract'
 import type { StatsCollector } from '../stats/collector'
 import type { IPtyProvider } from '../providers/types'
@@ -47,6 +48,10 @@ export class OrcaRuntimeWithStateFields extends OrcaRuntimeWithLinearCommands {
   protected readonly agentProfiles?: AgentProfileConnectionService
   protected readonly prepareClaudeAuth?: PrepareClaudeAuth
 
+  protected readonly getAgentStatusSnapshotForPaneFn:
+    | ((paneKey: string) => AgentStatusIpcPayload[])
+    | null
+
   protected readonly machineName = new RuntimeMachineName(
     () => this.store?.getSettings?.().machineName
   )
@@ -66,6 +71,7 @@ export class OrcaRuntimeWithStateFields extends OrcaRuntimeWithLinearCommands {
       // terminal output. worktree.ps reads this at query time so mobile shows the
       // same inline agent rows the desktop sidebar does — same source, 1:1.
       getAgentStatusSnapshot?: () => AgentStatusIpcPayload[]
+      getAgentStatusSnapshotForPane?: (paneKey: string) => AgentStatusIpcPayload[]
       /** Where structured (native chat) sessions publish into that same store, so the snapshot
        *  above lists them like every other agent. */
       structuredAgentStatusSink?: StructuredAgentSessionStatusSink
@@ -89,6 +95,7 @@ export class OrcaRuntimeWithStateFields extends OrcaRuntimeWithLinearCommands {
         paneKey: string
       ) => Promise<'live' | 'unverifiable' | 'exited' | null>
       reconcileAgentStatusForEndedProcess?: (paneKeys: Iterable<string>) => void
+      dropAgentStatusForRemovedWorktree?: (worktreeId: string, host?: ExecutionHostScope) => void
       canRecoverPersistentLocalPtys?: () => boolean
       // Why: the device registry lives on the RPC server, which is constructed with this runtime;
       // a closure defers the lookup past that ordering instead of inverting ownership.
@@ -222,6 +229,7 @@ export class OrcaRuntimeWithStateFields extends OrcaRuntimeWithLinearCommands {
       this.stats = stats
     }
     this.getAgentStatusSnapshotFn = deps?.getAgentStatusSnapshot ?? null
+    this.getAgentStatusSnapshotForPaneFn = deps?.getAgentStatusSnapshotForPane ?? null
     this.structuredAgentStatusSinkFn = deps?.structuredAgentStatusSink ?? null
     this.readObservedAgentStatusPaneIdentityFn =
       deps?.readObservedAgentStatusPaneIdentity ?? (() => ({ kind: 'unobserved' }))
@@ -234,6 +242,7 @@ export class OrcaRuntimeWithStateFields extends OrcaRuntimeWithLinearCommands {
       deps?.retireAgentHookCompatibilityAuthority ?? null
     this.checkHookAgentPresenceFn = deps?.checkHookAgentPresence ?? null
     this.reconcileAgentStatusForEndedProcessFn = deps?.reconcileAgentStatusForEndedProcess ?? null
+    this.dropAgentStatusForRemovedWorktreeFn = deps?.dropAgentStatusForRemovedWorktree ?? null
     this.canRecoverPersistentLocalPtysFn = deps?.canRecoverPersistentLocalPtys ?? (() => true)
     this.getPairedDeviceNameFn = deps?.getPairedDeviceName ?? (() => null)
     // Why: configure the shared AiVault scan cache from a serve-mode-reachable

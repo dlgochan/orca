@@ -1,9 +1,14 @@
 import type { ClaudeStructuredLaunchResolverDeps } from '../claude/claude-structured-launch-resolution'
-import type { AgentSessionAccountHome } from '../../shared/agent-session-account-home'
+import {
+  agentSessionAccountHome,
+  type AgentSessionAccountHome
+} from '../../shared/agent-session-account-home'
+import type { AgentSessionStoredAgent } from '../../shared/agent-session-stored-agent'
+import type { StructuredAgentId } from '../../shared/agent-session-provider-handle'
 import { hasIsolatedClaudeAccountAuth } from '../claude-accounts/isolated-account-auth'
 // Captures host-owned profile identity without acquiring credentials at create-intent time.
 import type { AgentSessionExecutionLocation } from '../../shared/agent-session-record'
-import type { AgentProfileSnapshot, ProfileAgent } from '../../shared/agent-launch-profile'
+import type { AgentProfileSnapshot } from '../../shared/agent-launch-profile'
 import type { AgentProfileConnectionService } from '../agent-profiles/connection-service'
 import { assertAgentProfileEnvironment } from '../agent-profiles/terminal-command'
 import type { PreparedAgentProfile } from '../agent-profiles/connection-contracts'
@@ -11,7 +16,7 @@ import type { PreparedAgentProfile } from '../agent-profiles/connection-contract
 export async function resolveStructuredProfileSnapshot(
   service: AgentProfileConnectionService | undefined,
   id: string,
-  agent: ProfileAgent,
+  agent: StructuredAgentId,
   location: AgentSessionExecutionLocation
 ): Promise<AgentProfileSnapshot> {
   if (!service || location.executionHostId !== 'local' || location.wslDistro !== null) {
@@ -63,14 +68,14 @@ export async function structuredClaudeProfileInvocationDeps(
 }
 
 export function structuredAgentProfileAccountHome(input: {
-  agent: ProfileAgent
+  agent: AgentSessionStoredAgent
   agentProfile?: AgentProfileSnapshot
   managedAccounts?: readonly { id: string; managedAuthPath: string }[]
   selectedPath: string
   path: string
 }): AgentSessionAccountHome {
   const account =
-    !input.agentProfile && input.agent === 'claude'
+    !input.agentProfile && input.agent.agent === 'claude'
       ? input.managedAccounts?.find(
           (entry) =>
             entry.managedAuthPath === input.selectedPath &&
@@ -78,8 +83,7 @@ export function structuredAgentProfileAccountHome(input: {
         )
       : undefined
   return {
-    variable: input.agent === 'claude' ? 'CLAUDE_CONFIG_DIR' : 'CODEX_HOME',
-    path: input.path,
+    ...agentSessionAccountHome(input.agent, input.path),
     ...(input.agentProfile ? { agentProfile: input.agentProfile } : {}),
     ...(account ? { claudeAccountId: account.id } : {})
   }
@@ -89,7 +93,7 @@ export type StructuredAgentSessionCreateIntentInput = {
   agentProfileId?: string
   envelope: { sessionId: string; clientOperationId: string }
   worktree: string
-  agent: ProfileAgent
+  agent: StructuredAgentId
   callerKey?: string
   resumeFrom?: { providerSessionId: string }
 }

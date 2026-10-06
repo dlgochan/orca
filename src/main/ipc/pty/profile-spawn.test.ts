@@ -303,136 +303,139 @@ describe.each(['desktop', 'runtime'] as const)('%s daemon profile routing', (sur
   )
 })
 
-describe.each(['desktop', 'runtime'] as const)('%s shared external Claude ownership', (surface) => {
-  const run = surface === 'desktop' ? runPtyIpcSpawn : spawnPtyFromRuntimeController
-  async function withHome(
-    operation: (f: ReturnType<typeof fixture>) => Promise<void>,
-    independent = false
-  ) {
-    const root = mkdtempSync(join(tmpdir(), 'orca-profile-gate-'))
-    const home = join(root, 'runtime')
-    mkdirSync(home)
-    const alias = join(root, 'alias')
-    symlinkSync(home, alias)
-    vi.stubEnv('CLAUDE_CONFIG_DIR', alias)
-    const f = fixture('claude', true)
-    f.prepared.snapshot.resolvedHome = realpathSync(independent ? root : home)
-    f.prepared.envPatch.CLAUDE_CONFIG_DIR = f.prepared.snapshot.resolvedHome
-    try {
-      await operation(f)
-    } finally {
-      clearProviderPtyState('external-committed')
-      attachClaudeLivePtyPersistence(null)
-      rmSync(root, { recursive: true, force: true })
+describe.skipIf(process.platform === 'win32').each(['desktop', 'runtime'] as const)(
+  '%s shared external Claude ownership',
+  (surface) => {
+    const run = surface === 'desktop' ? runPtyIpcSpawn : spawnPtyFromRuntimeController
+    async function withHome(
+      operation: (f: ReturnType<typeof fixture>) => Promise<void>,
+      independent = false
+    ) {
+      const root = mkdtempSync(join(tmpdir(), 'orca-profile-gate-'))
+      const home = join(root, 'runtime')
+      mkdirSync(home)
+      const alias = join(root, 'alias')
+      symlinkSync(home, alias)
+      vi.stubEnv('CLAUDE_CONFIG_DIR', alias)
+      const f = fixture('claude', true)
+      f.prepared.snapshot.resolvedHome = realpathSync(independent ? root : home)
+      f.prepared.envPatch.CLAUDE_CONFIG_DIR = f.prepared.snapshot.resolvedHome
+      try {
+        await operation(f)
+      } finally {
+        clearProviderPtyState('external-committed')
+        attachClaudeLivePtyPersistence(null)
+        rmSync(root, { recursive: true, force: true })
+      }
     }
-  }
-  it('transfers the shared pending lease, persists it, preserves reattach and releases on exit/recovery', async () => {
-    await withHome(async (f) => {
-      const add = vi.fn()
-      const remove = vi.fn()
-      attachClaudeLivePtyPersistence({
-        addClaudeLivePtySessionId: add,
-        removeClaudeLivePtySessionId: remove
-      })
-      const spawn = vi.spyOn(localProvider, 'spawn').mockImplementation(async () => {
-        expect(hasLiveLegacyClaudePtys()).toBe(true)
-        expect(hasLiveClaudePtys()).toBe(false)
-        return { id: 'external-committed', pid: 123 }
-      })
-      await run(f.deps, { cols: 80, rows: 24, command: 'claude', agentProfileId: 'a' })
-      expect(hasLiveLegacyClaudePtys()).toBe(true)
-      expect(add).toHaveBeenCalledWith('external-committed')
-      expect(f.prepared.release).toHaveBeenCalledOnce()
-      expect(f.legacy).not.toHaveBeenCalled()
-      spawn.mockResolvedValue({ id: 'external-committed', isReattach: true })
-      await run(f.deps, {
-        cols: 80,
-        rows: 24,
-        sessionId: 'external-committed',
-        agentProfileId: 'deleted'
-      })
-      expect(f.service.prepareById).toHaveBeenCalledOnce()
-      expect(hasLiveLegacyClaudePtys()).toBe(true)
-      clearProviderPtyState('external-committed')
-      expect(hasClaudeCredentialOwners()).toBe(false)
-      expect(remove).toHaveBeenCalledWith('external-committed')
-      seedLiveClaudePtysFromPersistence(['external-committed'])
-      confirmSeededClaudeLivePtys(['external-committed'])
-      expect(hasLiveLegacyClaudePtys()).toBe(true)
-      clearProviderPtyState('external-committed')
-      seedLiveClaudePtysFromPersistence(['external-committed'])
-      confirmSeededClaudeLivePtys([])
-      expect(hasClaudeCredentialOwners()).toBe(false)
-    })
-  })
-  it('releases the pending shared lease on provider refusal', async () => {
-    await withHome(async (f) => {
-      vi.spyOn(localProvider, 'spawn').mockImplementation(async () => {
-        expect(hasLiveLegacyClaudePtys()).toBe(true)
-        throw new Error('synthetic refusal')
-      })
-      await expect(
-        run(f.deps, { cols: 80, rows: 24, command: 'claude', agentProfileId: 'a' })
-      ).rejects.toThrow('synthetic refusal')
-      expect(hasClaudeCredentialOwners()).toBe(false)
-      expect(f.prepared.release).toHaveBeenCalledOnce()
-    })
-  })
-  it('does not resurrect ownership when the provider reports an exit before its spawn reply', async () => {
-    await withHome(async (f) => {
-      vi.spyOn(localProvider, 'spawn').mockResolvedValue({
-        id: 'external-committed',
-        exitedBeforeSpawnReply: true
-      })
-      await expect(
-        run(f.deps, { cols: 80, rows: 24, command: 'claude', agentProfileId: 'a' })
-      ).rejects.toThrow('agent_session_exited_during_start')
-      expect(hasClaudeCredentialOwners()).toBe(false)
-      expect(f.prepared.release).toHaveBeenCalledOnce()
-    })
-  })
-  it('does not assign the prepared profile to a reattach won during provider spawn', async () => {
-    await withHome(async (f) => {
-      vi.spyOn(localProvider, 'spawn').mockResolvedValue({
-        id: 'external-committed',
-        isReattach: true
-      })
-      await run(f.deps, { cols: 80, rows: 24, command: 'claude', agentProfileId: 'a' })
-      expect(hasClaudeCredentialOwners()).toBe(false)
-      expect(f.prepared.release).toHaveBeenCalledOnce()
-    })
-  })
-  it.each(['command', 'validation'] as const)(
-    'releases shared ownership when %s preparation fails',
-    async (failure) => {
+    it('transfers the shared pending lease, persists it, preserves reattach and releases on exit/recovery', async () => {
       await withHome(async (f) => {
-        if (failure === 'validation') {
-          f.service.validateLaunch.mockRejectedValue(new Error('synthetic validation'))
-        }
-        const spawn = vi.spyOn(localProvider, 'spawn')
+        const add = vi.fn()
+        const remove = vi.fn()
+        attachClaudeLivePtyPersistence({
+          addClaudeLivePtySessionId: add,
+          removeClaudeLivePtySessionId: remove
+        })
+        const spawn = vi.spyOn(localProvider, 'spawn').mockImplementation(async () => {
+          expect(hasLiveLegacyClaudePtys()).toBe(true)
+          expect(hasLiveClaudePtys()).toBe(false)
+          return { id: 'external-committed', pid: 123 }
+        })
+        await run(f.deps, { cols: 80, rows: 24, command: 'claude', agentProfileId: 'a' })
+        expect(hasLiveLegacyClaudePtys()).toBe(true)
+        expect(add).toHaveBeenCalledWith('external-committed')
+        expect(f.prepared.release).toHaveBeenCalledOnce()
+        expect(f.legacy).not.toHaveBeenCalled()
+        spawn.mockResolvedValue({ id: 'external-committed', isReattach: true })
+        await run(f.deps, {
+          cols: 80,
+          rows: 24,
+          sessionId: 'external-committed',
+          agentProfileId: 'deleted'
+        })
+        expect(f.service.prepareById).toHaveBeenCalledOnce()
+        expect(hasLiveLegacyClaudePtys()).toBe(true)
+        clearProviderPtyState('external-committed')
+        expect(hasClaudeCredentialOwners()).toBe(false)
+        expect(remove).toHaveBeenCalledWith('external-committed')
+        seedLiveClaudePtysFromPersistence(['external-committed'])
+        confirmSeededClaudeLivePtys(['external-committed'])
+        expect(hasLiveLegacyClaudePtys()).toBe(true)
+        clearProviderPtyState('external-committed')
+        seedLiveClaudePtysFromPersistence(['external-committed'])
+        confirmSeededClaudeLivePtys([])
+        expect(hasClaudeCredentialOwners()).toBe(false)
+      })
+    })
+    it('releases the pending shared lease on provider refusal', async () => {
+      await withHome(async (f) => {
+        vi.spyOn(localProvider, 'spawn').mockImplementation(async () => {
+          expect(hasLiveLegacyClaudePtys()).toBe(true)
+          throw new Error('synthetic refusal')
+        })
         await expect(
-          run(f.deps, {
-            cols: 80,
-            rows: 24,
-            command: 'claude',
-            agentProfileId: 'a',
-            ...(failure === 'command' ? { launchAgent: 'codex' as const } : {})
-          })
-        ).rejects.toThrow()
-        expect(spawn).not.toHaveBeenCalled()
+          run(f.deps, { cols: 80, rows: 24, command: 'claude', agentProfileId: 'a' })
+        ).rejects.toThrow('synthetic refusal')
         expect(hasClaudeCredentialOwners()).toBe(false)
         expect(f.prepared.release).toHaveBeenCalledOnce()
       })
-    }
-  )
-  it('keeps an independent external home outside the gate', async () => {
-    await withHome(async (f) => {
-      vi.spyOn(localProvider, 'spawn').mockImplementation(async () => {
+    })
+    it('does not resurrect ownership when the provider reports an exit before its spawn reply', async () => {
+      await withHome(async (f) => {
+        vi.spyOn(localProvider, 'spawn').mockResolvedValue({
+          id: 'external-committed',
+          exitedBeforeSpawnReply: true
+        })
+        await expect(
+          run(f.deps, { cols: 80, rows: 24, command: 'claude', agentProfileId: 'a' })
+        ).rejects.toThrow('agent_session_exited_during_start')
         expect(hasClaudeCredentialOwners()).toBe(false)
-        return { id: 'external-committed', pid: 123 }
+        expect(f.prepared.release).toHaveBeenCalledOnce()
       })
-      await run(f.deps, { cols: 80, rows: 24, command: 'claude', agentProfileId: 'a' })
-      expect(hasClaudeCredentialOwners()).toBe(false)
-    }, true)
-  })
-})
+    })
+    it('does not assign the prepared profile to a reattach won during provider spawn', async () => {
+      await withHome(async (f) => {
+        vi.spyOn(localProvider, 'spawn').mockResolvedValue({
+          id: 'external-committed',
+          isReattach: true
+        })
+        await run(f.deps, { cols: 80, rows: 24, command: 'claude', agentProfileId: 'a' })
+        expect(hasClaudeCredentialOwners()).toBe(false)
+        expect(f.prepared.release).toHaveBeenCalledOnce()
+      })
+    })
+    it.each(['command', 'validation'] as const)(
+      'releases shared ownership when %s preparation fails',
+      async (failure) => {
+        await withHome(async (f) => {
+          if (failure === 'validation') {
+            f.service.validateLaunch.mockRejectedValue(new Error('synthetic validation'))
+          }
+          const spawn = vi.spyOn(localProvider, 'spawn')
+          await expect(
+            run(f.deps, {
+              cols: 80,
+              rows: 24,
+              command: 'claude',
+              agentProfileId: 'a',
+              ...(failure === 'command' ? { launchAgent: 'codex' as const } : {})
+            })
+          ).rejects.toThrow()
+          expect(spawn).not.toHaveBeenCalled()
+          expect(hasClaudeCredentialOwners()).toBe(false)
+          expect(f.prepared.release).toHaveBeenCalledOnce()
+        })
+      }
+    )
+    it('keeps an independent external home outside the gate', async () => {
+      await withHome(async (f) => {
+        vi.spyOn(localProvider, 'spawn').mockImplementation(async () => {
+          expect(hasClaudeCredentialOwners()).toBe(false)
+          return { id: 'external-committed', pid: 123 }
+        })
+        await run(f.deps, { cols: 80, rows: 24, command: 'claude', agentProfileId: 'a' })
+        expect(hasClaudeCredentialOwners()).toBe(false)
+      }, true)
+    })
+  }
+)
